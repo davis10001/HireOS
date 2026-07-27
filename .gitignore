@@ -1,0 +1,16 @@
+.DS_Store
+Thumbs.db
+
+# Local editor files
+.idea/
+.vscode/
+
+# Runtime/build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment files
+.env
+.env.*
