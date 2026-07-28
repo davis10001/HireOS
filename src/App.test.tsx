@@ -423,6 +423,9 @@ describe("Login + Jobs prototype slice", () => {
     await user.click(screen.getByRole("button", { name: "Critical" }));
     expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
     expect(screen.getByText("Source: Applications")).toBeInTheDocument();
+    expect(screen.getByText("Low-confidence inbox review: Forwarded profile from agency")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate review: Quang Do / Q. Do")).toBeInTheDocument();
+    expect(screen.getByText("AI Action approval: Match")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Waiting on Others" }));
     expect(screen.getByText("Assessment submission follow-up")).toBeInTheDocument();
