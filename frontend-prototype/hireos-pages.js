@@ -851,6 +851,153 @@ const jobsFilterState = {
   job: "all",
 };
 
+function governancePercent(value) {
+  return `${Math.round(Number(value) * 100)}%`;
+}
+
+function governancePillClass(mode) {
+  if (mode === "auto_allowed") return "green";
+  if (mode === "forbidden") return "danger";
+  return "warn";
+}
+
+function governanceModeLabel(mode) {
+  if (mode === "auto_allowed") return "Auto";
+  if (mode === "threshold_gated") return "Threshold";
+  if (mode === "approval_required") return "Approval";
+  if (mode === "forbidden") return "Forbidden";
+  return mode;
+}
+
+function renderGovernanceRows(container, rows) {
+  if (!container) return;
+  container.innerHTML = rows
+    .map(
+      (row) =>
+        `<div class="governance-row"><strong>${row.label}</strong><span class="pill ${row.className || ""}">${row.meta}</span></div>`,
+    )
+    .join("");
+}
+
+function renderGovernanceState(state) {
+  document.body.dataset.governanceSeamVersion = window.HireOSGovernanceSeam.GOVERNANCE_SEAM_VERSION;
+  document.querySelectorAll("[data-governance-threshold]").forEach((input) => {
+    const key = input.dataset.governanceThreshold;
+    input.value = state.thresholds[key];
+  });
+  document.querySelectorAll("[data-governance-output]").forEach((output) => {
+    const key = output.dataset.governanceOutput;
+    output.textContent = governancePercent(state.thresholds[key]);
+  });
+  document.querySelectorAll("[data-governance-sla]").forEach((input) => {
+    const key = input.dataset.governanceSla;
+    input.value = state.slaDefaults[key];
+  });
+
+  renderGovernanceRows(
+    document.querySelector("[data-governance-roles]"),
+    state.roles.map((role) => ({
+      label: role.label,
+      meta: role.canEditGovernance ? "Edit" : role.canViewAudit ? "Audit" : "Limited",
+      className: role.canEditGovernance ? "green" : role.canViewAudit ? "" : "warn",
+    })),
+  );
+  renderGovernanceRows(
+    document.querySelector("[data-governance-rules]"),
+    state.aiAutomationRules.map((rule) => ({
+      label: rule.label,
+      meta: governanceModeLabel(rule.mode),
+      className: governancePillClass(rule.mode),
+    })),
+  );
+  renderGovernanceRows(
+    document.querySelector("[data-governance-audit-policy]"),
+    state.auditPolicy.requiredEvents.map((eventName) => ({
+      label: eventName.replaceAll("_", " "),
+      meta: state.auditPolicy.humanApprovalRequired.includes(eventName) ? "Approval" : "Audit",
+      className: state.auditPolicy.humanApprovalRequired.includes(eventName) ? "warn" : "",
+    })),
+  );
+  renderGovernanceRows(
+    document.querySelector("[data-governance-auto-allowed]"),
+    state.aiAutomationRules
+      .filter((rule) => rule.mode === "auto_allowed" || rule.mode === "threshold_gated")
+      .map((rule) => ({
+        label: rule.label,
+        meta: governanceModeLabel(rule.mode),
+        className: governancePillClass(rule.mode),
+      })),
+  );
+  renderGovernanceRows(
+    document.querySelector("[data-governance-approval-required]"),
+    state.aiAutomationRules
+      .filter((rule) => rule.mode === "approval_required" || rule.mode === "forbidden")
+      .map((rule) => ({
+        label: rule.label,
+        meta: governanceModeLabel(rule.mode),
+        className: governancePillClass(rule.mode),
+      })),
+  );
+
+  const mailboxTable = document.querySelector("[data-governance-mailboxes]");
+  if (mailboxTable) {
+    mailboxTable.innerHTML = `<div class="table-row header"><span>Mailbox</span><span>Status</span><span>Scope</span><span>Write-back</span><span>Review</span></div>${state.mailboxes
+      .map(
+        (mailbox) =>
+          `<div class="table-row"><div class="cell-main"><strong>${mailbox.address}</strong><span>${mailbox.id}</span></div><span class="pill green">${mailbox.status}</span><span>${mailbox.foldersWatched.length} folders</span><span>${mailbox.writebackMode}</span><span>${mailbox.reviewPolicy}</span></div>`,
+      )
+      .join("")}`;
+  }
+
+  const seamSummary = document.querySelector("[data-governance-seam-summary]");
+  if (seamSummary) {
+    seamSummary.textContent = `Seam ${window.HireOSGovernanceSeam.GOVERNANCE_SEAM_VERSION}: candidate ${governancePercent(
+      state.thresholds.candidateMatch,
+    )}, job ${governancePercent(state.thresholds.jobMatch)}, duplicate ${governancePercent(
+      state.thresholds.duplicateConfidence,
+    )}, auto-apply ${governancePercent(state.thresholds.autoApply)}.`;
+  }
+}
+
+function initGovernanceSettings() {
+  if (!window.HireOSGovernanceSeam) return;
+  const seam = window.HireOSGovernanceSeam;
+  let savedState = seam.loadGovernanceState();
+  let draftState = JSON.parse(JSON.stringify(savedState));
+  renderGovernanceState(draftState);
+
+  document.querySelectorAll("[data-governance-threshold]").forEach((input) => {
+    input.addEventListener("input", () => {
+      draftState.thresholds[input.dataset.governanceThreshold] = Number(input.value);
+      renderGovernanceState(draftState);
+    });
+  });
+
+  document.querySelectorAll("[data-governance-sla]").forEach((input) => {
+    input.addEventListener("input", () => {
+      draftState.slaDefaults[input.dataset.governanceSla] = Number(input.value);
+    });
+  });
+
+  document.querySelectorAll(".primary-button").forEach((button) => {
+    if (!/Save Changes/i.test(button.textContent)) return;
+    button.addEventListener("click", () => {
+      savedState = seam.updateGovernanceState(savedState, {
+        thresholds: draftState.thresholds,
+        slaDefaults: draftState.slaDefaults,
+      }, {
+        actorId: "local-hr-admin",
+        reason: "Saved Settings governance controls",
+      });
+      draftState = JSON.parse(JSON.stringify(savedState));
+      seam.saveGovernanceState(savedState);
+      renderGovernanceState(draftState);
+      button.classList.add("saved");
+      setTimeout(() => button.classList.remove("saved"), 900);
+    });
+  });
+}
+
 const jobsMetricPresets = {
   all: [
     ["活跃岗位", "12", "8 个岗位已完整配置"],
@@ -1163,4 +1310,5 @@ initJobDetailTabs();
 initInboxWorkTabs();
 initMailboxConnectFlow();
 initJobCreateFlow();
+initGovernanceSettings();
 refreshIcons();

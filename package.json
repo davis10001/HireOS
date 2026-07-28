@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/verify-prototype-build.js"
+  },
+  "devDependencies": {}
+}
