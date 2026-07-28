@@ -3,15 +3,22 @@ import {
   Activity,
   Archive,
   ArrowLeft,
+  BadgeCheck,
   Bell,
   BriefcaseBusiness,
+  CalendarClock,
   ChartNoAxesCombined,
+  Check,
   ChevronUp,
+  Download,
+  FileQuestion,
   FilePenLine,
+  FileUser,
   Inbox,
   Layers3,
   LayoutDashboard,
   LogOut,
+  MessagesSquare,
   OctagonAlert,
   PanelLeftClose,
   PanelRightClose,
@@ -21,6 +28,7 @@ import {
   SendHorizontal,
   Settings,
   Sparkles,
+  TriangleAlert,
   UserRound,
   UsersRound,
   X
@@ -140,8 +148,8 @@ export default function App() {
     <AppShell
       activeRoute={shellActiveRoute(route)}
       agentContext={agentContext}
-      agentTitle={route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
-      agentSubtitle={route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
+      agentTitle={route === "application-detail" ? "申请 AI 工作区" : route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
+      agentSubtitle={route === "application-detail" ? "候选人、流程状态和下一步" : route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -163,9 +171,10 @@ export default function App() {
         />
       ) : null}
       {route === "job-detail" ? (
-        <JobDetailPage job={selectedJob} onBack={() => navigate("jobs")} />
+        <JobDetailPage job={selectedJob} onBack={() => navigate("jobs")} onOpenApplication={() => navigate("application-detail")} />
       ) : null}
-      {isPlaceholderRoute(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {route === "application-detail" ? <ApplicationDetailPage /> : null}
+      {isPlaceholderRoute(route) && route !== "application-detail" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -557,7 +566,7 @@ function JobCreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   );
 }
 
-function JobDetailPage({ job, onBack }: { job?: Job; onBack: () => void }) {
+function JobDetailPage({ job, onBack, onOpenApplication }: { job?: Job; onBack: () => void; onOpenApplication: () => void }) {
   const [activeTab, setActiveTab] = useState<"candidates" | "details">("candidates");
 
   if (!job) {
@@ -584,7 +593,7 @@ function JobDetailPage({ job, onBack }: { job?: Job; onBack: () => void }) {
           <div className="panel-header"><div><h2>候选人成员列表</h2><p>当前岗位下的候选人、流程状态、负责人和下一步动作</p></div></div>
           <div className="table apps-table">
             <div className="table-row header"><span>候选人</span><span>状态</span><span>负责人</span><span>下一步</span><span>SLA</span></div>
-            <button className="table-row table-row-button" type="button"><div className="cell-main"><strong>Trang Nguyen</strong><span>7 个证据事件 · 1 个测评</span></div><span>创始人审核</span><span>Founder</span><span>批准终面</span><span className="pill warn">今天</span></button>
+            <button className="table-row table-row-button" type="button" onClick={onOpenApplication}><div className="cell-main"><strong>Trang Nguyen</strong><span>7 个证据事件 · 1 个测评</span></div><span>创始人审核</span><span>Founder</span><span>批准终面</span><span className="pill warn">今天</span></button>
             <div className="table-row"><div className="cell-main"><strong>Anh Le</strong><span>面试反馈混合 · 存在证据缺口</span></div><span>面试</span><span>Mai Ho</span><span>收集反馈</span><span className="pill danger">逾期</span></div>
             <div className="table-row"><div className="cell-main"><strong>Minh Pham</strong><span>Offer 证据完整</span></div><span>Offer 决策</span><span>Founder</span><span>决策</span><span className="pill green">就绪</span></div>
           </div>
@@ -598,6 +607,91 @@ function JobDetailPage({ job, onBack }: { job?: Job; onBack: () => void }) {
         </section>
       </section>
     </>
+  );
+}
+
+function ApplicationDetailPage() {
+  const [activeTab, setActiveTab] = useState<"basic" | "interview" | "questions">("interview");
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Trang Nguyen · 高级后端工程师</h1><p>候选人基本信息、面试流程与状态、AI 下一步建议。</p></div>
+      </header>
+      <section className="page-content">
+        <div className="secondary-tabs application-detail-tabs" aria-label="申请详情视图">
+          <button className={`secondary-tab ${activeTab === "basic" ? "active" : ""}`} type="button" onClick={() => setActiveTab("basic")}><FileUser aria-hidden="true" /> 基本信息</button>
+          <button className={`secondary-tab ${activeTab === "interview" ? "active" : ""}`} type="button" onClick={() => setActiveTab("interview")}><MessagesSquare aria-hidden="true" /> 面试流程</button>
+          <button className={`secondary-tab ${activeTab === "questions" ? "active" : ""}`} type="button" onClick={() => setActiveTab("questions")}><FileQuestion aria-hidden="true" /> 生成题目</button>
+        </div>
+
+        <section className={`ai-summary-panel ${activeTab === "basic" ? "" : "is-hidden"}`} data-application-detail-panel="basic">
+          <div><span>AI 分析与建议</span><p>候选人在后端架构、调试深度和 API ownership 上已有强证据；主要缺口是压力下领导力和跨团队协作。建议进入创始人终面，不再增加一轮测评。</p></div>
+          <div className="ai-summary-action"><strong>推荐动作</strong><span>建议推进创始人终面，并在终面中覆盖压力下领导力、跨团队冲突和候选人 Offer 时间线。</span></div>
+        </section>
+        <section className={`panel ${activeTab === "basic" ? "" : "is-hidden"}`} data-application-detail-panel="basic">
+          <div className="panel-header"><div><h2>候选人基本信息</h2><p>申请身份、当前流程和完整简历详情</p></div></div>
+          <div className="applicant-summary"><div><span>申请人姓名</span><strong>Trang Nguyen</strong></div><div><span>面试岗位</span><strong>高级后端工程师</strong></div><div><span>招聘经理</span><strong>Linh Tran</strong></div><div><span>当前阶段</span><strong>创始人终面</strong></div><div><span>状态</span><strong>待安排 · 今天到期</strong></div></div>
+          <section className="resume-detail-block">
+            <div className="resume-detail-head"><div><h3>简历详情</h3><p>Trang_Nguyen_Backend_CV.pdf · 2026-07-28 由 recruiting@company.vn 收到</p></div><button className="ghost-button" type="button"><Download aria-hidden="true" /> 下载原始简历</button></div>
+            <div className="resume-profile"><div><span>当前职位</span><strong>后端工程师</strong></div><div><span>核心经验</span><strong>金融科技 API、分布式系统、服务可靠性</strong></div><div><span>工作方式</span><strong>胡志明市 · 可接受混合办公</strong></div><div><span>语言协作</span><strong>英文技术沟通已确认</strong></div></div>
+            <div className="resume-section-grid">
+              <article><h4>技术栈</h4><p>Go、Node.js、PostgreSQL、Redis、Kafka、Docker、Kubernetes、AWS。熟悉高并发 API、异步任务、支付与风控相关服务。</p></article>
+              <article><h4>项目经历</h4><p>主导金融科技平台账户与交易 API 重构，将关键接口延迟降低并提升可观测性；参与拆分单体服务到事件驱动架构。</p></article>
+              <article><h4>系统能力</h4><p>具备服务降级、幂等设计、数据一致性、故障排查和容量规划经验，能在跨团队场景中推动接口契约落地。</p></article>
+              <article><h4>招聘备注</h4><p>薪资范围、Notice period、地点和英文协作已在 HR 审核中确认；AI 解析置信度 94%，邮件线程已关联。</p></article>
+            </div>
+            <div className="config-meta"><span className="pill green">高匹配</span><span className="pill">CV 已解析</span><span className="pill">94% 置信度</span><span className="pill">原文保留</span></div>
+          </section>
+        </section>
+
+        <section className={`ai-summary-panel ${activeTab === "interview" ? "" : "is-hidden"}`} data-application-detail-panel="interview">
+          <div><span>AI 总结分析</span><p>候选人在后端架构、调试深度、书面沟通和 API ownership 上已有强证据；测评 V2 已补齐关键技术判断，不建议继续加测。当前主要缺口是压力下领导力、跨团队冲突处理和候选人 Offer 时间线。</p></div>
+          <div className="ai-summary-action"><strong>推荐动作</strong><span>进入创始人终面，安排 45 分钟面试，只覆盖未验证能力。</span></div>
+        </section>
+        <section className={`panel interview-panel ${activeTab === "interview" ? "" : "is-hidden"}`} data-application-detail-panel="interview">
+          <div className="panel-header"><div><h2>面试流程与状态</h2><p>当前申请在该岗位下的阶段、负责人、下一步、SLA、AI 准备状态和证据缺口</p></div></div>
+          <div className="application-timeline">
+            <ApplicationStep done icon={<Check />} title="HR 审核" subtitle="基础条件、薪资范围和英语协作已确认" status="已完成" owner="Linh Tran" next="无" sla="完成" ai="摘要已生成 · 追问已记录" evidence="地点、薪资、Notice period、英语协作" />
+            <ApplicationStep done icon={<Check />} title="技术面试" subtitle="系统设计、调试思路和 API 质量已验证" status="已完成" owner="Tech Lead" next="补充记录" sla="完成" ai="记录已摘要 · 评分待面试官确认" evidence="架构取舍、调试深度、API ownership" focus="证据强度高；缺少的是领导力场景，而不是技术深度。" />
+            <ApplicationStep done icon={<Check />} title="测评" subtitle="V2 提交已解析，代码取舍证据充足" status="已完成" owner="HR + Tech Lead" next="归档评分" sla="完成" ai="V1/V2 已比较 · Rubric 已关联" evidence="不建议继续加测，信息增益偏低" />
+            <article className="application-step current">
+              <div className="step-marker"><CalendarClock aria-hidden="true" /></div>
+              <div className="step-card">
+                <div className="step-head"><div><strong>创始人终面</strong><span>需要验证压力下的领导力、团队协作和 Offer 风险</span></div><span className="pill warn">待安排</span></div>
+                <div className="step-meta"><span>负责人：创始人</span><span>下一步：确认终面时间</span><span>SLA：今天</span></div>
+                <div className="step-detail-list"><div><span>AI 状态</span><strong>Brief 已生成 · 终面问题待确认</strong></div><div><span>证据缺口</span><strong>压力下领导力、跨团队冲突、候选人时间线</strong></div></div>
+                <div className="step-focus warn"><TriangleAlert aria-hidden="true" /><span>AI 推荐安排 45 分钟创始人终面；候选人提到本周还有另一个 Offer 时间线，建议先确认可面试时间。</span></div>
+                <div className="step-artifacts"><button className="primary-button" type="button"><BadgeCheck aria-hidden="true" /> 推进终面</button></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className={`panel question-workspace ${activeTab === "questions" ? "" : "is-hidden"}`} data-application-detail-panel="questions">
+          <div className="panel-header"><div><h2>生成题目</h2><p>基于候选人证据缺口与终面目标，与 AI 协作生成面试题</p></div><button className="ai-button" type="button"><Sparkles aria-hidden="true" /> 继续生成</button></div>
+          <div className="question-meta-grid"><article><span>生成的人</span><strong>Linh Tran</strong><small>HR Lead · 2026-07-28 10:24</small></article><article><span>面试阶段</span><strong>创始人终面</strong><small>45 分钟 · 只覆盖未验证能力</small></article><article><span>AI 依据</span><strong>7 个证据事件</strong><small>技术面试、测评 V2、简历和邮件线程</small></article></div>
+          <div className="question-workspace-grid">
+            <section className="question-chat"><h3>AI 交互记录</h3><div className="chat-turn user"><span>Linh Tran</span><p>请基于当前证据缺口生成创始人终面问题，不要重复技术深度问题。</p></div><div className="chat-turn ai"><span>HireOS AI</span><p>已排除后端架构、调试深度和 API ownership，题目聚焦压力下领导力、跨团队冲突处理和 Offer 时间线。</p></div><div className="chat-turn user"><span>Linh Tran</span><p>每个问题要能产生可评分证据，并给出追问方向。</p></div></section>
+            <section className="question-list"><h3>已生成题目</h3><article className="question-card"><span>01 · 领导力</span><strong>讲一次你在关键系统压力下推动团队做取舍的经历。</strong><p>追问：你如何判断优先级、同步风险，以及复盘后改变了什么。</p></article><article className="question-card"><span>02 · 跨团队冲突</span><strong>当产品、合规和工程对上线窗口意见冲突时，你会如何推进决策？</strong><p>追问：你会要求哪些证据，哪些情况会暂停上线。</p></article><article className="question-card"><span>03 · Offer 风险</span><strong>你当前的时间线和其他机会会怎样影响入职决策？</strong><p>追问：确认可接受的决策窗口、薪资边界和入职限制。</p></article></section>
+          </div>
+        </section>
+      </section>
+    </>
+  );
+}
+
+function ApplicationStep({ ai, done, evidence, focus, icon, next, owner, sla, status, subtitle, title }: { ai: string; done?: boolean; evidence: string; focus?: string; icon: ReactNode; next: string; owner: string; sla: string; status: string; subtitle: string; title: string }) {
+  return (
+    <article className={`application-step ${done ? "done" : ""}`}>
+      <div className="step-marker">{icon}</div>
+      <div className="step-card">
+        <div className="step-head"><div><strong>{title}</strong><span>{subtitle}</span></div><span className="pill green">{status}</span></div>
+        <div className="step-meta"><span>负责人：{owner}</span><span>下一步：{next}</span><span>SLA：{sla}</span></div>
+        <div className="step-detail-list"><div><span>AI 状态</span><strong>{ai}</strong></div><div><span>面试反馈</span><strong>{evidence}</strong></div></div>
+        {focus ? <div className="step-focus"><BadgeCheck aria-hidden="true" /><span>{focus}</span></div> : null}
+      </div>
+    </article>
   );
 }
 
@@ -702,7 +796,7 @@ function routeToPath(route: RouteId, jobId?: string): string {
 }
 
 function shellActiveRoute(route: RouteId): ShellNavRoute {
-  if (route === "job-detail") return "jobs";
+  if (route === "job-detail" || route === "application-detail") return "jobs";
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
@@ -733,6 +827,19 @@ function placeholderTabs(route: PlaceholderRoute): string[] {
 }
 
 function buildAgentContext(route: RouteId, job?: Job): AgentContext {
+  if (route === "application-detail") {
+    return {
+      recommendation: "可以询问候选人背景、面试状态、为什么建议进入终面，或让 AI 起草终面问题。",
+      evidence: [
+        { label: "建议", value: "推进创始人终面，不再增加测评。" },
+        { label: "风险", value: "领导力缺口需要在终面覆盖。" },
+        { label: "置信度", value: "高 · 已关联 7 个证据事件。" }
+      ],
+      ask: "询问这个候选人的背景、证据缺口、终面准备或下一步动作。",
+      approveLabel: "起草问题",
+      reviewLabel: "查看依据"
+    };
+  }
   if (route === "job-detail" && job) {
     return {
       recommendation: "Review the Assessment rubric before sending another case, then keep the job Active.",

@@ -122,6 +122,21 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(agent).getByText("Job AI Workspace")).toBeInTheDocument();
     expect(within(agent).getByText("Review the Assessment rubric before sending another case, then keep the job Active.")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: /trang nguyen/i }));
+    expect(screen.getByRole("heading", { name: "Trang Nguyen · 高级后端工程师" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /面试流程/i })).toHaveClass("active");
+    expect(screen.getByRole("heading", { name: "面试流程与状态" })).toBeInTheDocument();
+    expect(screen.getByText("推进终面")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Agent 对话区")).getByText("申请 AI 工作区")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /基本信息/i }));
+    expect(screen.getByRole("heading", { name: "候选人基本信息" })).toBeInTheDocument();
+    expect(screen.getByText("简历详情")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /生成题目/i }));
+    expect(screen.getByRole("heading", { name: "生成题目" })).toBeInTheDocument();
+    expect(screen.getByText("已生成题目")).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: /account menu/i }));
     await user.click(screen.getByRole("button", { name: /sign out/i }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
