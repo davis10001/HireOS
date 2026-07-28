@@ -174,6 +174,7 @@ type AgentContext = {
 type PlaceholderRow = { item: string; state: string; owner: string; action: string; sla: string; note: string; warn?: boolean };
 type PlaceholderModule = { title: string; detail: string; rows: PlaceholderRow[] };
 type Language = "EN" | "中文";
+type RouteState = { route: RouteId; jobId: string | null; applicationId: string | null; taskView: TaskView | null };
 
 const appCopy = {
   EN: {
@@ -213,9 +214,10 @@ const appCopy = {
 } satisfies Record<Language, Record<string, string>>;
 
 export default function App() {
+  const initialRoute = readRouteFromLocation();
   const [session, setSession] = useState<AuthSession | null>(() => loadAuthState());
-  const [route, setRoute] = useState<RouteId>(() => readRouteFromLocation().route);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(() => readRouteFromLocation().jobId);
+  const [route, setRoute] = useState<RouteId>(() => initialRoute.route);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(() => initialRoute.jobId);
   const [jobs, setJobs] = useState<Job[]>(loadJobs);
   const [candidates, setCandidates] = useState<Candidate[]>(loadCandidates);
   const [applications, setApplications] = useState<Application[]>(loadApplications);
@@ -223,7 +225,8 @@ export default function App() {
   const [governance, setGovernance] = useState<GovernanceState>(loadGovernance);
   const [language, setLanguage] = useState<Language>(loadLanguage);
   const [taskCompletions, setTaskCompletions] = useState<TaskCompletion[]>(loadTaskCompletions);
-  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => initialRoute.applicationId);
+  const [initialTaskView, setInitialTaskView] = useState<TaskView | null>(() => initialRoute.taskView);
 
   useEffect(() => {
     saveJobs(jobs);
@@ -259,16 +262,18 @@ export default function App() {
       setRoute(next.route);
       setSelectedJobId(next.jobId);
       setSelectedApplicationId(next.applicationId);
+      setInitialTaskView(next.taskView);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  function navigate(routeId: RouteId, jobId?: string) {
-    window.history.pushState({}, "", routeToPath(routeId, jobId));
+  function navigate(routeId: RouteId, jobId?: string, taskView?: TaskView) {
+    window.history.pushState({}, "", routeToPath(routeId, jobId, taskView));
     setRoute(routeId);
     setSelectedJobId(jobId ?? null);
     setSelectedApplicationId(routeId === "application-detail" ? jobId ?? null : null);
+    setInitialTaskView(routeId === "tasks" ? taskView ?? null : null);
   }
 
   function createCandidate(candidate: Candidate) {
@@ -417,12 +422,13 @@ export default function App() {
         window.history.pushState({}, "", "/login");
         setRoute("dashboard");
         setSelectedJobId(null);
+        setInitialTaskView(null);
       }}
       session={session}
       taskCount={tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed").length}
     >
-      {route === "dashboard" ? <DashboardPage /> : null}
-      {route === "tasks" ? <TasksPage actor={{ name: session.name, role: session.role }} onTaskAction={recordTaskAction} tasks={tasks} /> : null}
+      {route === "dashboard" ? <DashboardPage applications={applications} assessments={assessments} jobs={jobs} onOpenTasks={(view) => navigate("tasks", undefined, view)} tasks={tasks} /> : null}
+      {route === "tasks" ? <TasksPage actor={{ name: session.name, role: session.role }} initialView={initialTaskView} onTaskAction={recordTaskAction} tasks={tasks} /> : null}
       {route === "jobs" ? (
         <JobsPage
           jobs={jobs}
@@ -667,32 +673,106 @@ function NavButton({ active, count, icon, label, onClick }: { active: boolean; c
   );
 }
 
-function DashboardPage() {
+function DashboardPage({
+  applications,
+  assessments,
+  jobs,
+  onOpenTasks,
+  tasks
+}: {
+  applications: Application[];
+  assessments: Assessment[];
+  jobs: Job[];
+  onOpenTasks: (view: TaskView) => void;
+  tasks: RecruitingTask[];
+}) {
+  const criticalTasks = filterTasks(tasks, "Critical", { name: "", role: "" });
+  const todayTasks = filterTasks(tasks, "Today", { name: "", role: "" });
+  const waitingTasks = filterTasks(tasks, "Waiting on Others", { name: "", role: "" });
+  const batchTasks = filterTasks(tasks, "Batch Review", { name: "", role: "" });
+  const activeJobs = jobs.filter((job) => job.status === "active");
+  const interviewTasks = tasks.filter((task) => task.sourceModule === "Applications" && /interview/i.test(`${task.title} ${task.nextAction}`));
+  const reviewLoad = batchTasks.length + assessments.filter((assessment) => ["Submitted", "Parsed", "In Review", "Calibrate"].includes(assessment.status)).length;
+  const openTasks = tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed");
+  const healthScore = Math.max(0, Math.round(((activeJobs.length + applications.length) / Math.max(1, activeJobs.length + applications.length + waitingTasks.length + criticalTasks.length)) * 100));
+
+  const summaries: DashboardSummaryCard[] = [
+    {
+      detail: `${criticalTasks.slice(0, 2).map((task) => task.sourceModule).join(", ") || "No same-day risks"} need a decision path.`,
+      icon: <OctagonAlert aria-hidden="true" />,
+      label: "Critical",
+      tone: "danger",
+      value: String(criticalTasks.length),
+      view: "Critical"
+    },
+    {
+      detail: `${todayTasks.length ? "Due by today's SLA window" : "No due-today tasks"} across active recruiting work.`,
+      icon: <CalendarClock aria-hidden="true" />,
+      label: "Today Due",
+      tone: "warn",
+      value: String(todayTasks.length),
+      view: "Today"
+    },
+    {
+      detail: "Candidate, founder, or setup dependencies that need a nudge or route.",
+      icon: <PauseCircle aria-hidden="true" />,
+      label: "Waiting on Others",
+      value: String(waitingTasks.length),
+      view: "Waiting on Others"
+    },
+    {
+      detail: interviewTasks.length ? interviewTasks.slice(0, 2).map((task) => task.title).join(" · ") : "Interview work will appear here once scheduled.",
+      icon: <MessagesSquare aria-hidden="true" />,
+      label: "Upcoming Interviews",
+      value: String(interviewTasks.length),
+      view: "Today"
+    },
+    {
+      detail: `${reviewLoad} evidence or intake items can be handled together.`,
+      icon: <Layers3 aria-hidden="true" />,
+      label: "Batch Review",
+      value: String(batchTasks.length),
+      view: "Batch Review"
+    },
+    {
+      detail: `${openTasks.length} open tasks across ${activeJobs.length} active jobs.`,
+      icon: <Activity aria-hidden="true" />,
+      label: "Recruitment Health",
+      tone: healthScore < 70 ? "warn" : "green",
+      value: `${healthScore}%`,
+      view: "All Tasks"
+    }
+  ];
+
   return (
     <>
       <header className="topbar">
-        <div className="page-title"><h1>Dashboard</h1><p>Hiring operations overview and AI risk recommendations.</p></div>
+        <div className="page-title"><h1>Daily Home</h1><p>Founder and HR summary for today&apos;s recruiting decisions, handoffs, and health.</p></div>
       </header>
-      <section className="page-content">
-        <section className="metric-grid">
-          <Metric label="Active Jobs" value="12" detail="8 configured roles" />
-          <Metric label="Needs Review" value="76" detail="Inbox and workflow items" />
-          <Metric label="Blocked" value="6" detail="Owner or SLA gaps" warning />
+      <section className="page-content dashboard-home">
+        <section className="dashboard-summary-grid" aria-label="Daily task summary">
+          {summaries.map((summary) => <DashboardSummaryCard key={summary.label} onOpenTasks={onOpenTasks} summary={summary} />)}
         </section>
         <section className="unframed-section">
-          <div className="panel-header"><div><h2>Operations Workbench</h2><p>Placeholder shell content preserved for the Dashboard route.</p></div></div>
+          <div className="panel-header"><div><h2>Daily Focus</h2><p>Summary-only home view. Use each card to continue in the filtered Task Center.</p></div><span className="pill green">{openTasks.length} open task signals</span></div>
         </section>
         <section className="content-grid">
           <section className="panel">
             <div className="panel-header"><div><h2>Activity Timeline</h2><p>Recent recruiting operations events stay in the Dashboard hierarchy.</p></div></div>
             <div className="timeline">
-              <TimelineStep index="09:10" title="Job created" detail="Senior Backend Engineer configuration reviewed" status="Done" />
-              <TimelineStep index="10:30" title="Workflow check" detail="Platform Engineer still needs SLA defaults" status="Risk" warn />
+              {applications.flatMap((application) => application.timeline).slice(-3).map((event) => (
+                <TimelineStep key={event.id} index={new Date(event.occurredAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} title={event.title} detail={event.detail} status={event.actor} />
+              ))}
             </div>
           </section>
           <section className="panel">
             <div className="panel-header"><div><h2>Risk Recommendations</h2><p>Dashboard-level AI recommendations remain separate from module detail work.</p></div></div>
-            <div className="cards"><div className="work-card"><div className="card-top"><div className="card-copy"><strong>Resolve workflow gaps</strong><span>Confirm owner and SLA defaults before opening more job intake.</span></div><span className="pill warn">Review</span></div></div></div>
+            <div className="cards">
+              {criticalTasks.slice(0, 2).map((task) => (
+                <div className="work-card" key={task.id}><div className="card-top"><div className="card-copy"><strong>{task.title}</strong><span>{task.aiRecommendation ?? task.nextAction}</span></div><span className="pill warn">{task.priority}</span></div></div>
+              ))}
+              {criticalTasks.length === 0 ? <div className="work-card"><div className="card-top"><div className="card-copy"><strong>No critical task risk</strong><span>Continue from Today Due or Batch Review when new signals arrive.</span></div><span className="pill green">Ready</span></div></div> : null}
+            </div>
           </section>
         </section>
       </section>
@@ -700,13 +780,36 @@ function DashboardPage() {
   );
 }
 
-function TasksPage({ actor, onTaskAction, tasks }: { actor: { name: string; role: string }; onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
-  const [activeView, setActiveView] = useState<TaskView>("All Tasks");
+type DashboardSummaryCard = {
+  detail: string;
+  icon: ReactNode;
+  label: string;
+  tone?: "danger" | "green" | "warn";
+  value: string;
+  view: TaskView;
+};
+
+function DashboardSummaryCard({ onOpenTasks, summary }: { onOpenTasks: (view: TaskView) => void; summary: DashboardSummaryCard }) {
+  return (
+    <button aria-label={`Open ${summary.label} tasks`} className={`summary-card ${summary.tone ?? ""}`} onClick={() => onOpenTasks(summary.view)} type="button">
+      <span className="summary-icon">{summary.icon}</span>
+      <span className="summary-copy"><span>{summary.label}</span><strong>{summary.value}</strong><small>{summary.detail}</small></span>
+    </button>
+  );
+}
+
+function TasksPage({ actor, initialView, onTaskAction, tasks }: { actor: { name: string; role: string }; initialView: TaskView | null; onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
+  const [activeView, setActiveView] = useState<TaskView>(initialView ?? "All Tasks");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const visibleTasks = filterTasks(tasks, activeView, actor);
   const selectedTask = selectedTaskId ? tasks.find((task) => task.id === selectedTaskId) : undefined;
   const openTasks = tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed");
   const completedTasks = tasks.filter((task) => task.completedAction);
+
+  useEffect(() => {
+    setActiveView(initialView ?? "All Tasks");
+    setSelectedTaskId(null);
+  }, [initialView]);
 
   function chooseView(view: TaskView) {
     setActiveView(view);
@@ -1906,27 +2009,33 @@ function saveLocalState<T>(key: string, value: T) {
   }
 }
 
-function readRouteFromLocation(): { route: RouteId; jobId: string | null; applicationId: string | null } {
+function readRouteFromLocation(): RouteState {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
-  if (path === "/" || path === "/login" || path === "/dashboard") return { route: "dashboard", jobId: null, applicationId: null };
-  if (path === "/tasks") return { route: "tasks", jobId: null, applicationId: null };
-  if (path === "/jobs") return { route: "jobs", jobId: null, applicationId: null };
-  if (path.startsWith("/jobs/")) return { route: "job-detail", jobId: decodeURIComponent(path.slice("/jobs/".length)), applicationId: null };
-  if (path === "/applications") return { route: "applications", jobId: null, applicationId: null };
-  if (path.startsWith("/applications/")) return { route: "application-detail", jobId: null, applicationId: decodeURIComponent(path.slice("/applications/".length)) };
-  if (path === "/application-detail") return { route: "application-detail", jobId: null, applicationId: null };
-  if (path === "/settings/mailbox") return { route: "settings-mailbox", jobId: null, applicationId: null };
+  const taskView = parseTaskView(new URLSearchParams(window.location.search).get("view"));
+  if (path === "/" || path === "/login" || path === "/dashboard") return { route: "dashboard", jobId: null, applicationId: null, taskView: null };
+  if (path === "/tasks") return { route: "tasks", jobId: null, applicationId: null, taskView };
+  if (path === "/jobs") return { route: "jobs", jobId: null, applicationId: null, taskView: null };
+  if (path.startsWith("/jobs/")) return { route: "job-detail", jobId: decodeURIComponent(path.slice("/jobs/".length)), applicationId: null, taskView: null };
+  if (path === "/applications") return { route: "applications", jobId: null, applicationId: null, taskView: null };
+  if (path.startsWith("/applications/")) return { route: "application-detail", jobId: null, applicationId: decodeURIComponent(path.slice("/applications/".length)), taskView: null };
+  if (path === "/application-detail") return { route: "application-detail", jobId: null, applicationId: null, taskView: null };
+  if (path === "/settings/mailbox") return { route: "settings-mailbox", jobId: null, applicationId: null, taskView: null };
   const route = path.slice(1) as RouteId;
-  return isPlaceholderRoute(route) ? { route, jobId: null, applicationId: null } : { route: "dashboard", jobId: null, applicationId: null };
+  return isPlaceholderRoute(route) ? { route, jobId: null, applicationId: null, taskView: null } : { route: "dashboard", jobId: null, applicationId: null, taskView: null };
 }
 
-function routeToPath(route: RouteId, jobId?: string): string {
+function routeToPath(route: RouteId, jobId?: string, taskView?: TaskView): string {
   if (route === "dashboard") return "/dashboard";
-  if (route === "tasks") return "/tasks";
+  if (route === "tasks") return taskView ? `/tasks?view=${encodeURIComponent(taskView)}` : "/tasks";
   if (route === "job-detail") return `/jobs/${encodeURIComponent(jobId ?? "")}`;
   if (route === "application-detail") return jobId ? `/applications/${encodeURIComponent(jobId)}` : "/application-detail";
   if (route === "settings-mailbox") return "/settings/mailbox";
   return `/${route}`;
+}
+
+function parseTaskView(value: string | null): TaskView | null {
+  const taskViews: TaskView[] = ["All Tasks", "My Tasks", "Critical", "Today", "Waiting on Others", "Batch Review"];
+  return taskViews.includes(value as TaskView) ? value as TaskView : null;
 }
 
 function shellActiveRoute(route: RouteId): ShellNavRoute {
