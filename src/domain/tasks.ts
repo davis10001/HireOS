@@ -4,11 +4,12 @@ import { seedAiActions, seedDuplicateSignals, seedEmailThreads, seedInboxItems }
 import type { Interview } from "./interviews";
 import type { Job } from "./jobs";
 
-export type TaskSourceModule = "Applications" | "Assessments" | "Inbox" | "Jobs" | "Candidates";
+export type TaskSourceModule = "Applications" | "Assessments" | "Inbox" | "Jobs" | "Candidates" | "Settings";
 export type TaskPriority = "Critical" | "High" | "Normal";
 export type TaskStatus = "Open" | "Waiting on Others" | "Ready for Batch Review" | "Completed" | "Routed";
 export type TaskView = "All Tasks" | "My Tasks" | "Critical" | "Today" | "Waiting on Others" | "Batch Review";
 export type TaskActionKind = "complete" | "route";
+export type AiAutomationLevel = "L1" | "L2" | "L3" | "L4";
 
 export interface TaskAllowedAction {
   label: string;
@@ -36,6 +37,8 @@ export interface RecruitingTask {
   relatedObjects: TaskRelatedObject[];
   allowedActions: TaskAllowedAction[];
   aiRecommendation?: string;
+  aiAutomationLevel?: AiAutomationLevel;
+  aiApprovalRequired?: boolean;
   risk?: string;
   evidenceRefs?: string[];
   batchReview: boolean;
@@ -51,13 +54,17 @@ export function buildRecruitingTasks(input: { applications: Application[]; asses
   const tasks: RecruitingTask[] = [
     ...input.applications.flatMap(applicationTasks),
     ...input.applications.flatMap(interviewTasks),
+    founderOfferRiskTask(),
     ...input.assessments.map(assessmentTask),
     ...seedInboxItems.map(inboxTask),
     ...seedEmailThreads.filter((thread) => thread.status === "needs_review" || thread.confidence < 0.75).map(lowConfidenceInboxTask),
     ...seedDuplicateSignals.filter((signal) => signal.status === "review").map(duplicateReviewTask),
     ...seedAiActions.filter((action) => action.status === "pending_approval").map(aiActionApprovalTask),
     ...seedEmailThreads.filter((thread) => thread.detectedType === "Assessment").map(assessmentEmailTask),
-    ...input.jobs.filter((job) => job.blockedCount > 0 || job.status === "draft").map(jobTask)
+    ...input.jobs.filter((job) => job.blockedCount > 0 || job.status === "draft").map(jobTask),
+    settingsAlertTask(),
+    sensitiveCandidateMergeTask(),
+    sensitiveOfferDecisionTask()
   ];
 
   return tasks.map((task) => {
@@ -73,6 +80,14 @@ export function filterTasks(tasks: RecruitingTask[], view: TaskView, actor: { na
   if (view === "Today") return tasks.filter((task) => task.slaState === "Today");
   if (view === "Waiting on Others") return tasks.filter((task) => task.status === "Waiting on Others");
   return tasks.filter((task) => task.batchReview);
+}
+
+export function filterFounderTasks(tasks: RecruitingTask[]): RecruitingTask[] {
+  return tasks.filter((task) => task.ownerRole === "Founder" && (task.sourceModule === "Applications" || task.sourceModule === "Settings"));
+}
+
+export function filterSettingsGovernanceTasks(tasks: RecruitingTask[]): RecruitingTask[] {
+  return tasks.filter((task) => task.sourceModule === "Settings" || (task.aiApprovalRequired && task.ownerRole === "HR Admin"));
 }
 
 export function completeTask(task: RecruitingTask, actionLabel: string, completedBy: string, completedAt = new Date().toISOString()): TaskCompletion {
@@ -109,8 +124,16 @@ function applicationTask(application: Application): RecruitingTask {
     dueAt: application.dueAt || undefined,
     slaState: application.slaStatus,
     relatedObjects: applicationRelatedObjects(application),
-    allowedActions: [{ label: owner === "Founder" ? "Approve final interview" : "Complete next action", kind: "complete", targetStatus: "Completed" }],
+    allowedActions: owner === "Founder" ? [
+      { label: "Continue", kind: "complete", targetStatus: "Completed" },
+      { label: "Request More Evidence", kind: "route", targetStatus: "Routed" },
+      { label: "Final Interview", kind: "complete", targetStatus: "Completed" },
+      { label: "Reject", kind: "complete", targetStatus: "Completed" },
+      { label: "Offer Decision", kind: "complete", targetStatus: "Completed" }
+    ] : [{ label: "Complete next action", kind: "complete", targetStatus: "Completed" }],
     aiRecommendation: "Approve the final interview path and avoid adding extra assessment work.",
+    aiAutomationLevel: owner === "Founder" ? "L4" : "L2",
+    aiApprovalRequired: owner === "Founder",
     risk: "Candidate has another offer timeline this week; delay may reduce close rate.",
     evidenceRefs: application.timeline.map((event) => event.title),
     batchReview: false
@@ -178,6 +201,32 @@ function applicationRelatedObjects(application: Application): TaskRelatedObject[
     { module: "Jobs", id: application.jobId, label: application.jobTitle },
     { module: "Applications", id: application.id, label: `${application.candidateName} · ${application.jobTitle}` }
   ];
+}
+
+function founderOfferRiskTask(): RecruitingTask {
+  return {
+    id: "task-founder-offer-risk",
+    title: "Founder offer decision risk",
+    sourceModule: "Applications",
+    ownerRole: "Founder",
+    priority: "Critical",
+    status: "Open",
+    nextAction: "Human-confirm offer decision",
+    dueAt: "2026-07-28T18:00:00.000Z",
+    slaState: "Today",
+    relatedObjects: [{ module: "Applications", id: "application-trang-backend", label: "Trang Nguyen · Senior Backend Engineer" }],
+    allowedActions: [
+      { label: "Request More Evidence", kind: "route", targetStatus: "Routed" },
+      { label: "Reject", kind: "complete", targetStatus: "Completed" },
+      { label: "Offer Decision", kind: "complete", targetStatus: "Completed" }
+    ],
+    aiRecommendation: "Keep the offer decision with the Founder because the evidence packet includes sensitive decision and compensation context.",
+    aiAutomationLevel: "L4",
+    aiApprovalRequired: true,
+    risk: "Offer decision, rejection, and compensation-sensitive writebacks must remain human-confirmed and auditable.",
+    evidenceRefs: ["Moved to Founder Review", "Assessment evidence attached", "Offer decision approval required"],
+    batchReview: false
+  };
 }
 
 function assessmentTask(assessment: Assessment): RecruitingTask {
@@ -411,7 +460,7 @@ function aiActionApprovalTask(action: (typeof seedAiActions)[number]): Recruitin
     id: `task-inbox-ai-action-${action.id}`,
     title: `AI Action approval: ${action.actionType}`,
     sourceModule: "Inbox",
-    ownerRole: "HR",
+    ownerRole: "HR Admin",
     priority: "Critical",
     status: "Ready for Batch Review",
     nextAction: "Approve or route the sensitive AI action before write-back",
@@ -425,9 +474,83 @@ function aiActionApprovalTask(action: (typeof seedAiActions)[number]): Recruitin
       { label: "Route AI action for review", kind: "route", targetStatus: "Routed" }
     ],
     aiRecommendation: action.outputSummary,
+    aiAutomationLevel: "L3",
+    aiApprovalRequired: true,
     risk: "Sensitive or medium-confidence AI write-back requires a human approval task.",
     evidenceRefs: [...action.evidenceRefs, `${Math.round(action.confidence * 100)}% confidence`],
     batchReview: true
+  };
+}
+
+function settingsAlertTask(): RecruitingTask {
+  return {
+    id: "task-settings-governance-defaults",
+    title: "Review SLA defaults and automation levels",
+    sourceModule: "Settings",
+    ownerRole: "HR Admin",
+    priority: "Normal",
+    status: "Open",
+    nextAction: "Confirm SLA defaults and automation levels",
+    slaState: "Ready",
+    relatedObjects: [{ module: "Settings", id: "settings-governance", label: "Status, SLA, and AI governance" }],
+    allowedActions: [{ label: "Confirm governance defaults", kind: "complete", targetStatus: "Completed" }],
+    aiRecommendation: "Keep SLA defaults and L1-L4 approval levels visible where Settings owns governance.",
+    aiAutomationLevel: "L2",
+    aiApprovalRequired: false,
+    risk: "Missing defaults make blocked detection and approval routing unreliable.",
+    evidenceRefs: ["Founder decision 48h", "Pending approval 24h", "Automation L1-L4"],
+    batchReview: false
+  };
+}
+
+function sensitiveCandidateMergeTask(): RecruitingTask {
+  return {
+    id: "task-ai-candidate-merge",
+    title: "Approve AI candidate merge writeback",
+    sourceModule: "Inbox",
+    ownerRole: "HR Admin",
+    priority: "High",
+    status: "Ready for Batch Review",
+    nextAction: "Approve or reject candidate merge",
+    slaState: "Today",
+    relatedObjects: [
+      { module: "Inbox", id: "ai-agency-match", label: "Candidate merge approval" },
+      { module: "Inbox", id: "inbox-agency-forward", label: "Agency-forwarded profile" }
+    ],
+    allowedActions: [
+      { label: "Approve AI writeback", kind: "complete", targetStatus: "Completed" },
+      { label: "Reject AI writeback", kind: "complete", targetStatus: "Completed" }
+    ],
+    aiRecommendation: "Approve only after HR confirms candidate identity and job match.",
+    aiAutomationLevel: "L3",
+    aiApprovalRequired: true,
+    risk: "Wrong merge could pollute two candidate histories.",
+    evidenceRefs: ["Phone number matches an existing backend profile", "Identity confidence 72%", "Agency source differs"],
+    batchReview: true
+  };
+}
+
+function sensitiveOfferDecisionTask(): RecruitingTask {
+  return {
+    id: "task-ai-offer-decision",
+    title: "Confirm offer decision writeback",
+    sourceModule: "Settings",
+    ownerRole: "HR Admin",
+    priority: "Critical",
+    status: "Open",
+    nextAction: "Human-confirm offer decision",
+    slaState: "Today",
+    relatedObjects: [{ module: "Settings", id: "offer-decision-policy", label: "Offer decision writeback policy" }],
+    allowedActions: [
+      { label: "Reject AI writeback", kind: "complete", targetStatus: "Completed" },
+      { label: "Offer Decision", kind: "complete", targetStatus: "Completed" }
+    ],
+    aiRecommendation: "Never auto-apply offer decisions; keep final writeback human-confirmed.",
+    aiAutomationLevel: "L4",
+    aiApprovalRequired: true,
+    risk: "Offer decisions must stay human-confirmed and auditable.",
+    evidenceRefs: ["Offer decision", "Sensitive candidate communication", "Human approval required"],
+    batchReview: false
   };
 }
 

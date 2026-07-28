@@ -5,7 +5,13 @@ import { seedAssessments } from "./assessments";
 import { markAssessmentReady, parseAssessmentSubmission, recordAssessmentSubmission, sendAssessment, startAssessmentReview, acceptStopRule } from "./assessments";
 import { completeInterview, createInterviewForApplication } from "./interviews";
 import { seedJobs } from "./jobs";
-import { buildRecruitingTasks, completeTask, filterTasks } from "./tasks";
+import {
+  buildRecruitingTasks,
+  completeTask,
+  filterFounderTasks,
+  filterSettingsGovernanceTasks,
+  filterTasks
+} from "./tasks";
 
 describe("task contract", () => {
   it("derives cross-module task views and records completion metadata", () => {
@@ -31,8 +37,8 @@ describe("task contract", () => {
       { module: "Applications", id: "application-trang-backend", label: "Trang Nguyen · Senior Backend Engineer" }
     ]);
 
-    expect(completeTask(founderTask!, "Approve final interview", "Linh Tran", "2026-07-28T09:30:00.000Z")).toEqual({
-      completedAction: "Approve final interview",
+    expect(completeTask(founderTask!, "Final Interview", "Linh Tran", "2026-07-28T09:30:00.000Z")).toEqual({
+      completedAction: "Final Interview",
       completedAt: "2026-07-28T09:30:00.000Z",
       completedBy: "Linh Tran",
       id: "task-application-application-trang-backend",
@@ -56,7 +62,7 @@ describe("task contract", () => {
 
     const tasks = buildRecruitingTasks({ applications: [unhealthyApplication], assessments: [], jobs: [] });
 
-    const applicationTasks = tasks.filter((task) => task.sourceModule === "Applications");
+    const applicationTasks = tasks.filter((task) => task.sourceModule === "Applications" && task.id !== "task-founder-offer-risk");
 
     expect(applicationTasks.map((task) => task.title)).toEqual([
       "Risky Candidate application next action",
@@ -77,12 +83,13 @@ describe("task contract", () => {
     const tasks = buildRecruitingTasks({ applications: [], assessments: [], jobs: [] });
     const inboxTasks = tasks.filter((task) => task.sourceModule === "Inbox");
 
-    expect(inboxTasks.map((task) => task.title)).toEqual([
+    expect(inboxTasks.map((task) => task.title)).toEqual(expect.arrayContaining([
       "Agency-forwarded duplicate review",
       "Low-confidence inbox review: Forwarded profile from agency",
       "Duplicate review: Quang Do / Q. Do",
-      "AI Action approval: Match"
-    ]);
+      "AI Action approval: Match",
+      "Approve AI candidate merge writeback"
+    ]));
     expect(inboxTasks.find((task) => task.title.startsWith("Low-confidence"))?.relatedObjects).toEqual([
       { module: "Inbox", id: "thread-agency-forward", label: "Forwarded profile from agency" }
     ]);
@@ -159,5 +166,34 @@ describe("task contract", () => {
       [`task-assessment-calibration-${inReview.id}`, "Calibrate assessment result and stop-rule recommendation", "Linh Tran", "Ready"],
       [`task-assessment-stop-rule-${stopRule.id}`, "Confirm Stop Rule on the Application timeline", "Founder", "Ready"]
     ]));
+  });
+
+  it("filters Founder Inbox to decision and risk tasks without HR operational work", () => {
+    const tasks = buildRecruitingTasks({ applications: seedApplications, assessments: seedAssessments, jobs: seedJobs });
+    const founderTasks = filterFounderTasks(tasks);
+
+    expect(founderTasks.map((task) => [task.title, task.ownerRole, task.sourceModule, task.allowedActions.map((action) => action.label)])).toEqual([
+      ["Founder final interview approval", "Founder", "Applications", ["Continue", "Request More Evidence", "Final Interview", "Reject", "Offer Decision"]],
+      ["Founder offer decision risk", "Founder", "Applications", ["Request More Evidence", "Reject", "Offer Decision"]]
+    ]);
+    expect(founderTasks.map((task) => task.title)).not.toContain("Agency-forwarded duplicate review");
+    expect(founderTasks.map((task) => task.title)).not.toContain("Assessment submission follow-up");
+  });
+
+  it("emits Settings alerts and sensitive AI writebacks as governance tasks", () => {
+    const tasks = buildRecruitingTasks({ applications: seedApplications, assessments: seedAssessments, jobs: seedJobs });
+    const governanceTasks = filterSettingsGovernanceTasks(tasks);
+
+    expect(governanceTasks.map((task) => [task.title, task.sourceModule, task.ownerRole, task.aiAutomationLevel, task.nextAction])).toEqual([
+      ["AI Action approval: Match", "Inbox", "HR Admin", "L3", "Approve or route the sensitive AI action before write-back"],
+      ["Review SLA defaults and automation levels", "Settings", "HR Admin", "L2", "Confirm SLA defaults and automation levels"],
+      ["Approve AI candidate merge writeback", "Inbox", "HR Admin", "L3", "Approve or reject candidate merge"],
+      ["Confirm offer decision writeback", "Settings", "HR Admin", "L4", "Human-confirm offer decision"]
+    ]);
+    expect(governanceTasks.filter((task) => task.aiApprovalRequired).map((task) => task.title)).toEqual([
+      "AI Action approval: Match",
+      "Approve AI candidate merge writeback",
+      "Confirm offer decision writeback"
+    ]);
   });
 });

@@ -110,6 +110,8 @@ import {
   TaskView,
   buildRecruitingTasks,
   completeTask,
+  filterFounderTasks,
+  filterSettingsGovernanceTasks,
   filterTasks
 } from "./domain/tasks";
 import {
@@ -138,7 +140,7 @@ type RouteId =
   | "settings"
   | "settings-mailbox";
 
-type ShellNavRoute = "dashboard" | "tasks" | "jobs" | "candidates" | "applications" | "assessments" | "inbox" | "analytics" | "settings";
+type ShellNavRoute = "dashboard" | "tasks" | "jobs" | "candidates" | "applications" | "assessments" | "inbox" | "founder-inbox" | "analytics" | "settings";
 type PlaceholderRoute = Exclude<RouteId, "dashboard" | "tasks" | "jobs" | "job-detail">;
 
 const JOBS_KEY = "hireos.jobs";
@@ -184,6 +186,7 @@ const appCopy = {
     assessments: "Assessments",
     candidates: "Candidates",
     dashboard: "Dashboard",
+    founderInbox: "Founder Inbox",
     inbox: "Inbox",
     intelligence: "Intelligence",
     jobs: "Jobs",
@@ -201,6 +204,7 @@ const appCopy = {
     assessments: "测评",
     candidates: "候选人",
     dashboard: "看板",
+    founderInbox: "创始人待办",
     inbox: "待办箱",
     intelligence: "智能",
     jobs: "岗位",
@@ -491,9 +495,10 @@ export default function App() {
       {route === "inbox" ? <InboxPage onOpenDetail={() => navigate("inbox-detail")} onOpenEmailAgent={() => navigate("email-agent")} /> : null}
       {route === "email-agent" ? <EmailAgentPage /> : null}
       {route === "inbox-detail" ? <InboxDetailPage /> : null}
-      {route === "settings" ? <SettingsPage governance={governance} onOpenMailbox={() => navigate("settings-mailbox")} onTightenThreshold={tightenGovernanceThreshold} /> : null}
+      {route === "founder-inbox" ? <FounderInboxPage onTaskAction={recordTaskAction} tasks={tasks} /> : null}
+      {route === "settings" ? <SettingsPage governance={governance} tasks={tasks} onOpenMailbox={() => navigate("settings-mailbox")} onTightenThreshold={tightenGovernanceThreshold} /> : null}
       {route === "settings-mailbox" ? <SettingsMailboxPage governance={governance} onBack={() => navigate("settings")} /> : null}
-      {isPlaceholderRoute(route) && !["application-detail", "applications", "assessments", "candidates", "inbox", "email-agent", "inbox-detail", "settings", "settings-mailbox"].includes(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {isPlaceholderRoute(route) && !["application-detail", "applications", "assessments", "candidates", "inbox", "email-agent", "inbox-detail", "founder-inbox", "settings", "settings-mailbox"].includes(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -618,6 +623,7 @@ function AppShell({
           <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label={copy.applications} onClick={() => onNavigate("applications")} />
           <NavButton active={activeRoute === "assessments"} icon={<FilePenLine />} label={copy.assessments} onClick={() => onNavigate("assessments")} />
           <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label={copy.inbox} onClick={() => onNavigate("inbox")} />
+          <NavButton active={activeRoute === "founder-inbox"} icon={<BadgeCheck />} label={copy.founderInbox} onClick={() => onNavigate("founder-inbox")} />
         </nav>
         <div className="nav-section">{copy.intelligence}</div>
         <nav className="nav">
@@ -1745,10 +1751,57 @@ function InboxDetailPage() {
   );
 }
 
-function SettingsPage({ governance, onOpenMailbox, onTightenThreshold }: { governance: GovernanceState; onOpenMailbox: () => void; onTightenThreshold: () => void }) {
+function FounderInboxPage({ onTaskAction, tasks }: { onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
+  const founderTasks = filterFounderTasks(tasks);
+  const completedTasks = founderTasks.filter((task) => task.completedAction);
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Founder Inbox</h1><p>Founder Decision and risk escalation Tasks only; HR operational Tasks stay in Task Center.</p></div>
+      </header>
+      <section className="page-content">
+        <div className="hero-row">
+          <section className="hero-panel"><h2>{founderTasks.length} founder decisions need evidence-backed human confirmation.</h2><p>This role view consumes RecruitingTask, so Founder Inbox stays aligned with Task Center instead of becoming another queue.</p></section>
+          <section className="hero-panel ai"><h2>Audit boundary</h2><p>Continue, Request More Evidence, Final Interview, Reject and Offer Decision are human-confirmed Task actions.</p></section>
+        </div>
+        <section className="metric-grid">
+          <Metric label="Founder Tasks" value={String(founderTasks.length)} detail="Decision and risk only" warning />
+          <Metric label="HR Ops Hidden" value={String(tasks.length - founderTasks.length)} detail="Ordinary operational Tasks excluded" />
+          <Metric label="L4 Decisions" value={String(founderTasks.filter((task) => task.aiAutomationLevel === "L4").length)} detail="Human confirmation required" warning />
+          <Metric label="Completed Actions" value={String(completedTasks.length)} detail="Visible audit trail" />
+        </section>
+        <section className="content-grid">
+          {founderTasks.map((task) => (
+            <article className="panel" key={task.id}>
+              <div className="panel-header"><div><h2>{task.title}</h2><p>{task.relatedObjects.map((item) => item.label).join(" · ")}</p></div><span className={`pill ${task.slaState === "Today" || task.slaState === "Blocked" ? "warn" : "green"}`}>{task.slaState}</span></div>
+              <div className="config-meta"><span className="pill danger">{task.priority}</span><span className="pill">{task.sourceModule}</span><span className="pill warn">{task.aiAutomationLevel ?? "L2"}</span><span className="pill">{task.ownerRole}</span></div>
+              <div className="settings-grid">
+                <article className="config-card"><h3>AI Recommendation</h3><p>{task.aiRecommendation}</p><div className="config-meta"><span className="pill warn">{task.nextAction}</span></div></article>
+                <article className="config-card"><h3>Risk</h3><p>{task.risk}</p><div className="evidence-list">{(task.evidenceRefs ?? []).slice(0, 3).map((item) => <div className="evidence-item" key={item}><span>{item}</span><strong>Evidence</strong></div>)}</div></article>
+              </div>
+              {task.completedAction ? <div className="rule-note"><strong>Completed action: {task.completedAction}</strong><span>Completed by: {task.completedBy} · {formatDateTime(task.completedAt)}</span></div> : null}
+              <div className="review-action-grid">
+                {task.allowedActions.map((action) => <button className={action.kind === "complete" ? "primary-button" : "ghost-button"} disabled={Boolean(task.completedAction)} key={action.label} type="button" onClick={() => onTaskAction(task, action.label)}>{action.label} for {task.title}</button>)}
+              </div>
+            </article>
+          ))}
+        </section>
+        <section className="panel">
+          <div className="panel-header"><div><h2>Action Timeline</h2><p>Founder decisions write back through Task completion metadata.</p></div></div>
+          <div className="timeline">{completedTasks.map((task) => <TimelineStep key={task.id} index={task.status} title={`Task action: ${task.completedAction}`} detail={`${task.status === "Routed" ? routedAuditCopy(task.completedAction, task.completedBy) : `Done by ${task.completedBy}`} · ${formatDateTime(task.completedAt)}`} status={task.status} />)}{completedTasks.length === 0 ? <TimelineStep index="Ready" title="No Founder Task actions yet" detail="Use a human-confirmed action to record an audit-visible Task event." status="Open" /> : null}</div>
+        </section>
+      </section>
+    </>
+  );
+}
+
+function SettingsPage({ governance, onOpenMailbox, onTightenThreshold, tasks }: { governance: GovernanceState; onOpenMailbox: () => void; onTightenThreshold: () => void; tasks: RecruitingTask[] }) {
   const safeDecision = evaluateAiAction(governance, { actionType: "extract_evidence", confidence: 0.93 });
   const lowConfidenceDecision = evaluateAiAction(governance, { actionType: "candidate_match", confidence: 0.74 });
   const forbiddenDecision = evaluateAiAction(governance, { actionType: "auto_hire", confidence: 0.99 });
+  const governanceTasks = filterSettingsGovernanceTasks(tasks);
+  const approvalTasks = governanceTasks.filter((task) => task.aiApprovalRequired);
 
   return (
     <>
@@ -1772,7 +1825,7 @@ function SettingsPage({ governance, onOpenMailbox, onTightenThreshold }: { gover
           <div className="settings-grid">
             <button className="config-card link-card" type="button" onClick={onOpenMailbox}><h3>Mailbox Connections</h3><p>Control which HR inboxes AI can read, which folders count as recruiting data, and which sender domains require review.</p><div className="config-meta"><span className="pill green">Connected</span><span className="pill">{governance.mailboxes.length} inboxes</span><span className="pill warn">Low-conf review</span></div></button>
             <article className="config-card governance-card"><h3>Roles & Permissions</h3><p>Define who can create jobs, change job status, approve evidence, view abnormal processes, and make offer decisions.</p><div className="config-meta">{governance.roles.map((role) => <span className="pill" key={role.id}>{role.label}</span>)}</div></article>
-            <article className="config-card governance-card"><h3>Status & SLA Defaults</h3><p>Owner defaults, due dates, and blocked detection rules inherited by each new job.</p><div className="config-meta"><span className="pill">HR review {governance.slaDefaults.hrReviewHours}h</span><span className="pill warn">Founder {governance.slaDefaults.founderDecisionHours}h</span><span className="pill">Feedback {governance.slaDefaults.interviewFeedbackHours}h</span></div></article>
+            <article className="config-card governance-card"><h3>Status & SLA Defaults</h3><p>Owner defaults, due dates, and blocked detection rules inherited by each new job.</p><div className="config-meta"><span className="pill">HR review {governance.slaDefaults.hrReviewHours}h</span><span className="pill warn">Founder decision {governance.slaDefaults.founderDecisionHours}h</span><span className="pill">Feedback {governance.slaDefaults.interviewFeedbackHours}h</span><span className="pill warn">Pending approval {governance.slaDefaults.pendingApprovalHours}h</span></div></article>
             <article className="config-card governance-card"><h3>AI Automation Rules</h3><p>Choose which AI actions are automatic, which require approval, and which sensitive actions are out of scope for MVP.</p><div className="config-meta"><span className="pill green">{safeDecision.status}</span><span className="pill warn">{lowConfidenceDecision.status}</span><span className="pill danger">{forbiddenDecision.status}</span></div><div className="evidence-list"><div className="evidence-item"><span>Candidate match</span><strong>{Math.round(governance.thresholds.candidateMatch * 100)}%</strong></div><div className="evidence-item"><span>Auto apply</span><strong>{Math.round(governance.thresholds.autoApply * 100)}%</strong></div></div></article>
             <article className="config-card"><h3>Hiring Templates</h3><p>Reusable interview stages, scorecards, assessment plans, and evaluation rubrics for common role families.</p><div className="config-meta"><span className="pill">Engineer</span><span className="pill">GTM</span><span className="pill">Design</span><span className="pill">Ops</span></div></article>
             <article className="config-card governance-card"><h3>Evidence Policy</h3><p>Required evidence event types for decisions.</p><div className="config-meta">{governance.evidencePolicy.requiredDecisionEvidence.map((item) => <span className="pill" key={item}>{item}</span>)}</div></article>
@@ -1781,6 +1834,9 @@ function SettingsPage({ governance, onOpenMailbox, onTightenThreshold }: { gover
         <section className="content-grid">
           <section className="panel"><div className="panel-header"><div><h2>Audit Trail</h2><p>Settings changes append local audit events without mutating business records.</p></div></div><div className="timeline">{governance.auditEvents.map((event) => <TimelineStep key={event.id} index={event.actorType} title={event.action} detail={event.reason} status="Audit" />)}</div></section>
           <section className="panel"><div className="panel-header"><div><h2>Human Approval Required</h2><p>Sensitive AI actions route back through Inbox review.</p></div></div><div className="cards">{governance.auditPolicy.humanApprovalRequired.map((item) => <div className="work-card" key={item}><div className="card-copy"><strong>{item.replaceAll("_", " ")}</strong><span>Approval gate remains active in the MVP shell.</span></div></div>)}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Automation Levels</h2><p>L1-L4 defaults map AI autonomy to RecruitingTask approval behavior.</p></div></div><div className="table analytics-table"><div className="table-row header"><span>Level</span><span>Default</span><span>Task behavior</span></div><div className="table-row"><span className="pill green">L1</span><span>Suggest only</span><span>Human starts the writeback</span></div><div className="table-row"><span className="pill">L2</span><span>Draft and prepare</span><span>Task records next action and SLA</span></div><div className="table-row"><span className="pill warn">L3</span><span>Approval gated</span><span>AI Action Approval Task required</span></div><div className="table-row"><span className="pill danger">L4</span><span>Sensitive decision</span><span>Founder or HR Admin confirmation required</span></div></div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Governance Task Queue</h2><p>Settings alerts and sensitive AI writebacks consume RecruitingTask.</p></div><span className="pill warn">{governanceTasks.length} Tasks</span></div><div className="table apps-table"><div className="table-row header"><span>Task</span><span>Owner</span><span>Level</span><span>Next Action</span><span>SLA</span></div>{governanceTasks.map((task) => <div className="table-row" key={task.id}><div className="cell-main"><strong>{task.title}</strong><span>{task.sourceModule} · {task.aiApprovalRequired ? "AI Action Approval" : "Settings Alert"}</span></div><span>{task.ownerRole ?? task.owner ?? "Unassigned"}</span><span>{task.aiAutomationLevel ?? "L2"}</span><span>{task.nextAction}</span><span className={`pill ${task.slaState === "Today" ? "warn" : "green"}`}>{task.slaState}</span></div>)}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>AI Action Approval Tasks</h2><p>Sensitive writebacks remain Tasks, not a competing approval model.</p></div><span className="pill danger">{approvalTasks.length} approval Tasks</span></div><div className="cards">{approvalTasks.map((task) => <div className="work-card ai" key={task.id}><div className="card-copy"><strong>{task.title}</strong><span>{task.nextAction} · {task.ownerRole}</span></div><div className="config-meta"><span className="pill warn">{task.aiAutomationLevel} approval required</span><span className="pill">{task.slaState}</span></div></div>)}</div></section>
         </section>
       </section>
     </>
@@ -2078,7 +2134,7 @@ function shellActiveRoute(route: RouteId): ShellNavRoute {
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
-  if (route === "jobs" || route === "tasks" || route === "dashboard" || route === "candidates" || route === "applications" || route === "assessments" || route === "inbox" || route === "settings") return route;
+  if (route === "jobs" || route === "tasks" || route === "dashboard" || route === "candidates" || route === "applications" || route === "assessments" || route === "inbox" || route === "founder-inbox" || route === "settings") return route;
   return "dashboard";
 }
 

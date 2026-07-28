@@ -422,7 +422,7 @@ describe("Login + Jobs prototype slice", () => {
 
     await user.click(screen.getByRole("button", { name: "Critical" }));
     expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
-    expect(screen.getByText("Source: Applications")).toBeInTheDocument();
+    expect(screen.getAllByText("Source: Applications").length).toBeGreaterThan(0);
     expect(screen.getByText("Low-confidence inbox review: Forwarded profile from agency")).toBeInTheDocument();
     expect(screen.getByText("Duplicate review: Quang Do / Q. Do")).toBeInTheDocument();
     expect(screen.getByText("AI Action approval: Match")).toBeInTheDocument();
@@ -439,8 +439,8 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(detail).getByText("Evidence refs")).toBeInTheDocument();
     expect(within(detail).getByText("Related objects")).toBeInTheDocument();
 
-    await user.click(within(detail).getByRole("button", { name: "Approve final interview" }));
-    expect(screen.getByText(/Completed action: Approve final interview/i)).toBeInTheDocument();
+    await user.click(within(detail).getByRole("button", { name: "Final Interview" }));
+    expect(screen.getByText(/Completed action: Final Interview/i)).toBeInTheDocument();
     expect(screen.getByText(/Completed by: Linh Tran/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "All Tasks" }));
@@ -506,6 +506,28 @@ describe("Login + Jobs prototype slice", () => {
     await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
     expect(screen.getAllByText("Assessment ready to send").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Task action recorded").length).toBeGreaterThan(0);
+  });
+
+  it("keeps Founder Inbox decision-only and exposes Settings governance task approvals", async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    await user.click(screen.getByRole("button", { name: "Founder Inbox" }));
+
+    expect(screen.getByRole("heading", { name: "Founder Inbox" })).toBeInTheDocument();
+    expect(screen.getByText("Founder Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
+    expect(screen.getByText("Founder offer decision risk")).toBeInTheDocument();
+    expect(screen.queryByText("Agency-forwarded duplicate review")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Status & SLA Defaults")).toBeInTheDocument();
+    expect(screen.getByText("Automation Levels")).toBeInTheDocument();
+    expect(screen.getByText("Governance Task Queue")).toBeInTheDocument();
+    expect(screen.getByText("AI Action Approval Tasks")).toBeInTheDocument();
+    expect(screen.getAllByText("Confirm offer decision writeback").length).toBeGreaterThan(0);
   });
 });
 
