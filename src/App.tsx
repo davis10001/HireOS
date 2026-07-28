@@ -17,6 +17,7 @@ import {
   Inbox,
   Layers3,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   MailOpen,
   MailPlus,
@@ -104,6 +105,14 @@ import {
   seedInboxItems
 } from "./domain/inbox";
 import {
+  RecruitingTask,
+  TaskCompletion,
+  TaskView,
+  buildRecruitingTasks,
+  completeTask,
+  filterTasks
+} from "./domain/tasks";
+import {
   GovernanceState,
   defaultGovernanceState,
   evaluateAiAction,
@@ -113,6 +122,7 @@ import "./styles.css";
 
 type RouteId =
   | "dashboard"
+  | "tasks"
   | "jobs"
   | "job-detail"
   | "inbox"
@@ -128,8 +138,8 @@ type RouteId =
   | "settings"
   | "settings-mailbox";
 
-type ShellNavRoute = "dashboard" | "jobs" | "candidates" | "applications" | "assessments" | "inbox" | "analytics" | "settings";
-type PlaceholderRoute = Exclude<RouteId, "dashboard" | "jobs" | "job-detail">;
+type ShellNavRoute = "dashboard" | "tasks" | "jobs" | "candidates" | "applications" | "assessments" | "inbox" | "analytics" | "settings";
+type PlaceholderRoute = Exclude<RouteId, "dashboard" | "tasks" | "jobs" | "job-detail">;
 
 const JOBS_KEY = "hireos.jobs";
 const CANDIDATES_KEY = "hireos.candidates";
@@ -137,6 +147,7 @@ const APPLICATIONS_KEY = "hireos.applications";
 const ASSESSMENTS_KEY = "hireos.assessments";
 const GOVERNANCE_KEY = "hireos.governance";
 const LANGUAGE_KEY = "hireos.language";
+const TASK_COMPLETIONS_KEY = "hireos.taskCompletions";
 
 const placeholderLabels: Record<PlaceholderRoute, string> = {
   "application-detail": "Application Detail",
@@ -179,6 +190,7 @@ const appCopy = {
     newCandidate: "New Candidate",
     operate: "Operate",
     settings: "Settings",
+    tasks: "Tasks",
     signOut: "Sign out"
   },
   中文: {
@@ -195,6 +207,7 @@ const appCopy = {
     newCandidate: "新建候选人",
     operate: "运营",
     settings: "设置",
+    tasks: "任务",
     signOut: "退出登录"
   }
 } satisfies Record<Language, Record<string, string>>;
@@ -209,6 +222,7 @@ export default function App() {
   const [assessments, setAssessments] = useState<Assessment[]>(loadAssessments);
   const [governance, setGovernance] = useState<GovernanceState>(loadGovernance);
   const [language, setLanguage] = useState<Language>(loadLanguage);
+  const [taskCompletions, setTaskCompletions] = useState<TaskCompletion[]>(loadTaskCompletions);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
 
   useEffect(() => {
@@ -234,6 +248,10 @@ export default function App() {
   useEffect(() => {
     saveLanguage(language);
   }, [language]);
+
+  useEffect(() => {
+    saveTaskCompletions(taskCompletions);
+  }, [taskCompletions]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -339,6 +357,31 @@ export default function App() {
     setGovernance((current) => updateGovernanceState(current, { thresholds: { ...current.thresholds, candidateMatch: 0.9, autoApply: 0.94 } }, "Tighten AI writeback boundaries"));
   }
 
+  function recordTaskAction(task: RecruitingTask, actionLabel: string) {
+    const completion = completeTask(task, actionLabel, session?.name ?? "Linh Tran");
+    setTaskCompletions((current) => [completion, ...current.filter((item) => item.id !== task.id)]);
+    const applicationRef = task.relatedObjects.find((item) => item.module === "Applications");
+    if (applicationRef) {
+      setApplications((current) => current.map((application) => {
+        if (application.id !== applicationRef.id) return application;
+        return {
+          ...application,
+          timeline: [
+            ...application.timeline,
+            {
+              actor: completion.completedBy ?? "Linh Tran",
+              detail: `${actionLabel} recorded from Task Center.`,
+              eventType: "state_changed",
+              id: `timeline-${task.id}-${Date.now()}`,
+              occurredAt: completion.completedAt ?? new Date().toISOString(),
+              title: "Task action recorded"
+            }
+          ]
+        };
+      }));
+    }
+  }
+
   if (!session) {
     return (
       <LoginPage
@@ -356,6 +399,7 @@ export default function App() {
   const selectedJob = jobs.find((job) => job.id === selectedJobId);
   const selectedApplication = applications.find((application) => application.id === selectedApplicationId) ?? applications[0];
   const selectedApplicationCandidate = selectedApplication ? candidates.find((candidate) => candidate.id === selectedApplication.candidateId) : undefined;
+  const tasks = buildRecruitingTasks({ applications, assessments, jobs, completions: taskCompletions });
   const agentContext = buildAgentContext(route, selectedJob, selectedApplicationCandidate);
 
   return (
@@ -375,8 +419,10 @@ export default function App() {
         setSelectedJobId(null);
       }}
       session={session}
+      taskCount={tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed").length}
     >
       {route === "dashboard" ? <DashboardPage /> : null}
+      {route === "tasks" ? <TasksPage actor={{ name: session.name, role: session.role }} onTaskAction={recordTaskAction} tasks={tasks} /> : null}
       {route === "jobs" ? (
         <JobsPage
           jobs={jobs}
@@ -497,7 +543,8 @@ function AppShell({
   onLanguageChange,
   onNavigate,
   onSignOut,
-  session
+  session,
+  taskCount
 }: {
   activeRoute: ShellNavRoute;
   agentContext: AgentContext;
@@ -509,6 +556,7 @@ function AppShell({
   onNavigate: (route: ShellNavRoute) => void;
   onSignOut: () => void;
   session: AuthSession;
+  taskCount: number;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [agentCollapsed, setAgentCollapsed] = useState(false);
@@ -539,6 +587,7 @@ function AppShell({
         <div className="nav-section">{copy.operate}</div>
         <nav className="nav">
           <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label={copy.dashboard} onClick={() => onNavigate("dashboard")} />
+          <NavButton active={activeRoute === "tasks"} count={String(taskCount)} icon={<ListChecks />} label={copy.tasks} onClick={() => onNavigate("tasks")} />
           <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label={copy.jobs} onClick={() => onNavigate("jobs")} />
           <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label={copy.candidates} onClick={() => onNavigate("candidates")} />
           <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label={copy.applications} onClick={() => onNavigate("applications")} />
@@ -648,6 +697,101 @@ function DashboardPage() {
         </section>
       </section>
     </>
+  );
+}
+
+function TasksPage({ actor, onTaskAction, tasks }: { actor: { name: string; role: string }; onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
+  const [activeView, setActiveView] = useState<TaskView>("All Tasks");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const visibleTasks = filterTasks(tasks, activeView, actor);
+  const selectedTask = selectedTaskId ? tasks.find((task) => task.id === selectedTaskId) : undefined;
+  const openTasks = tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed");
+  const completedTasks = tasks.filter((task) => task.completedAction);
+
+  function chooseView(view: TaskView) {
+    setActiveView(view);
+    setSelectedTaskId(null);
+  }
+
+  function act(task: RecruitingTask, actionLabel: string) {
+    onTaskAction(task, actionLabel);
+  }
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Tasks</h1><p>One execution center for recruiting next actions, owners, SLA, and evidence-linked actions.</p></div>
+      </header>
+      <section className="page-content tasks-page">
+        <section className="metric-grid">
+          <Metric label="Open Tasks" value={String(openTasks.length)} detail="Across Applications, Inbox, Jobs, Assessments" />
+          <Metric label="Critical" value={String(tasks.filter((task) => task.priority === "Critical").length)} detail="Needs same-day attention" warning={tasks.some((task) => task.priority === "Critical")} />
+          <Metric label="Waiting" value={String(tasks.filter((task) => task.status === "Waiting on Others").length)} detail="Owned by candidate, founder, or setup dependency" />
+          <Metric label="Completed Actions" value={String(completedTasks.length)} detail="Local action history" />
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div><h2>Task Center</h2><p>Filters keep each execution view separate while preserving the same task contract underneath.</p></div>
+            <span className="pill green">Task contract baseline</span>
+          </div>
+          <div className="secondary-tabs task-tabs" aria-label="Task views">
+            {(["All Tasks", "My Tasks", "Critical", "Today", "Waiting on Others", "Batch Review"] as TaskView[]).map((view) => (
+              <button className={`secondary-tab ${activeView === view ? "active" : ""}`} key={view} type="button" onClick={() => chooseView(view)}>{view}</button>
+            ))}
+          </div>
+          <div className="table tasks-table">
+            <div className="table-row header"><span>Task</span><span>Source</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>
+            {visibleTasks.map((task) => (
+              <div className="table-row" key={task.id}>
+                <div className="cell-main"><strong>{task.title}</strong><span>{task.completedAction ? `Action recorded: ${task.completedAction}` : task.risk ?? "Ready for review"}</span></div>
+                <span>Source: {task.sourceModule}</span>
+                <span>{task.owner ?? task.ownerRole ?? "Unassigned"}</span>
+                <span>{task.nextAction}</span>
+                <span className={`pill ${task.slaState === "Today" || task.slaState === "Blocked" ? "warn" : "green"}`}>{task.slaState}{task.dueAt ? ` · ${new Date(task.dueAt).toLocaleDateString("en-CA")}` : ""}</span>
+                <button className="ghost-button row-action" type="button" onClick={() => setSelectedTaskId(task.id)}>Open {task.title}</button>
+              </div>
+            ))}
+          </div>
+          {visibleTasks.length === 0 ? <div className="empty-state">No tasks in this view.</div> : null}
+        </section>
+
+        <section className="content-grid">
+          <section className="panel"><div className="panel-header"><div><h2>Action Timeline</h2><p>Completes and routes are recorded visibly for audit review.</p></div></div><div className="timeline">{completedTasks.map((task) => <TimelineStep key={task.id} index={task.status} title={`Task action: ${task.completedAction}`} detail={`${task.status === "Routed" ? routedAuditCopy(task.completedAction, task.completedBy) : `Done by ${task.completedBy}`} · ${formatDateTime(task.completedAt)}`} status={task.status} />)}{completedTasks.length === 0 ? <TimelineStep index="Ready" title="No Task Center actions yet" detail="Complete or route a task to record local audit feedback." status="Open" /> : null}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Related Work</h2><p>Task links show the source object without changing the owning module.</p></div></div><div className="cards">{tasks.slice(0, 4).map((task) => <div className="work-card" key={task.id}><div className="card-top"><div className="card-copy"><strong>{task.sourceModule} context</strong><span>{task.relatedObjects.map((item) => `${item.module}: ${item.label}`).join(" · ")}</span></div><span className={`pill ${task.priority === "Critical" ? "warn" : "green"}`}>{task.priority}</span></div></div>)}</div></section>
+        </section>
+      </section>
+      {selectedTask ? <TaskDetailDialog onAction={act} onClose={() => setSelectedTaskId(null)} task={selectedTask} /> : null}
+    </>
+  );
+}
+
+function TaskDetailDialog({ onAction, onClose, task }: { onAction: (task: RecruitingTask, actionLabel: string) => void; onClose: () => void; task: RecruitingTask }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="mail-connect-modal task-detail-modal" role="dialog" aria-modal="true" aria-label={task.title}>
+        <header className="modal-header"><div><h2>{task.title}</h2><p>{task.sourceModule} task · {task.owner ?? task.ownerRole ?? "Unassigned"} owns the next step.</p></div><button className="icon-button" type="button" aria-label="关闭" onClick={onClose}><X aria-hidden="true" /></button></header>
+        <div className="connect-panels task-detail-grid">
+          <section className="connect-panel">
+            <div className="applicant-summary compact-summary"><div><span>Priority</span><strong>{task.priority}</strong></div><div><span>Status</span><strong>{task.status}</strong></div><div><span>SLA</span><strong>{task.slaState}</strong></div><div><span>Next action</span><strong>{task.nextAction}</strong></div></div>
+            <div className="rule-note"><strong>AI recommendation</strong><span>{task.aiRecommendation ?? "Review task context before changing owner or state."}</span></div>
+            <div className="rule-note"><strong>Risk</strong><span>{task.risk ?? "No AI risk attached."}</span></div>
+            {task.completedAction ? <div className="rule-note"><strong>Completion</strong><span>Completed action: {task.completedAction} · Completed by: {task.completedBy} · {formatDateTime(task.completedAt)}</span></div> : null}
+          </section>
+          <section className="connect-panel">
+            <div className="panel-header compact"><div><h3>Evidence refs</h3><p>Source evidence stays attached to the task.</p></div></div>
+            <div className="cards">{(task.evidenceRefs?.length ? task.evidenceRefs : ["No evidence refs attached"]).map((item) => <div className="work-card" key={item}><div className="card-copy"><strong>{item}</strong><span>Evidence ref</span></div></div>)}</div>
+            <div className="panel-header compact"><div><h3>Related objects</h3><p>Objects owned by source modules.</p></div></div>
+            <div className="config-meta">{task.relatedObjects.map((item) => <span className="pill" key={`${item.module}-${item.id}`}>{item.module}: {item.label}</span>)}</div>
+          </section>
+        </div>
+        <footer className="modal-footer">
+          <button className="ghost-button" type="button" onClick={onClose}>Close</button>
+          <span className="footer-spacer" />
+          {task.allowedActions.map((action) => <button className={action.kind === "complete" ? "primary-button" : "ghost-button"} disabled={Boolean(task.completedAction)} key={action.label} type="button" onClick={() => onAction(task, action.label)}>{action.label}</button>)}
+        </footer>
+      </div>
+    </div>
   );
 }
 
@@ -1649,6 +1793,18 @@ function parseScorecardScores(value: string): Record<string, number> {
   }, {});
 }
 
+function formatDateTime(value?: string): string {
+  if (!value) return "time not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleDateString("en-CA")} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function routedAuditCopy(action?: string, actor?: string): string {
+  if (action === "Route to HR review") return `Routed to HR review by ${actor}`;
+  return `${action ?? "Routed"} by ${actor}`;
+}
+
 function loadJobs(): Job[] {
   return loadLocalState(JOBS_KEY, seedJobs);
 }
@@ -1695,6 +1851,14 @@ function loadLanguage(): Language {
 
 function saveLanguage(language: Language) {
   saveLocalState(LANGUAGE_KEY, language);
+}
+
+function loadTaskCompletions(): TaskCompletion[] {
+  return loadLocalState(TASK_COMPLETIONS_KEY, []);
+}
+
+function saveTaskCompletions(completions: TaskCompletion[]) {
+  saveLocalState(TASK_COMPLETIONS_KEY, completions);
 }
 
 function syncAssessmentIntoApplications(applications: Application[], assessment: Assessment): Application[] {
@@ -1745,6 +1909,7 @@ function saveLocalState<T>(key: string, value: T) {
 function readRouteFromLocation(): { route: RouteId; jobId: string | null; applicationId: string | null } {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
   if (path === "/" || path === "/login" || path === "/dashboard") return { route: "dashboard", jobId: null, applicationId: null };
+  if (path === "/tasks") return { route: "tasks", jobId: null, applicationId: null };
   if (path === "/jobs") return { route: "jobs", jobId: null, applicationId: null };
   if (path.startsWith("/jobs/")) return { route: "job-detail", jobId: decodeURIComponent(path.slice("/jobs/".length)), applicationId: null };
   if (path === "/applications") return { route: "applications", jobId: null, applicationId: null };
@@ -1757,6 +1922,7 @@ function readRouteFromLocation(): { route: RouteId; jobId: string | null; applic
 
 function routeToPath(route: RouteId, jobId?: string): string {
   if (route === "dashboard") return "/dashboard";
+  if (route === "tasks") return "/tasks";
   if (route === "job-detail") return `/jobs/${encodeURIComponent(jobId ?? "")}`;
   if (route === "application-detail") return jobId ? `/applications/${encodeURIComponent(jobId)}` : "/application-detail";
   if (route === "settings-mailbox") return "/settings/mailbox";
@@ -1769,12 +1935,13 @@ function shellActiveRoute(route: RouteId): ShellNavRoute {
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
-  if (route === "jobs" || route === "dashboard" || route === "candidates" || route === "applications" || route === "assessments" || route === "inbox" || route === "settings") return route;
+  if (route === "jobs" || route === "tasks" || route === "dashboard" || route === "candidates" || route === "applications" || route === "assessments" || route === "inbox" || route === "settings") return route;
   return "dashboard";
 }
 
 function agentTitle(route: RouteId): string {
   if (route === "application-detail") return "申请 AI 工作区";
+  if (route === "tasks") return "Task AI Workspace";
   if (route === "job-detail") return "Job AI Workspace";
   if (route === "jobs") return "岗位 Agent";
   if (route === "assessments") return "Assessment Agent";
@@ -1787,6 +1954,7 @@ function agentTitle(route: RouteId): string {
 
 function agentSubtitle(route: RouteId): string {
   if (route === "application-detail") return "候选人、流程状态和下一步";
+  if (route === "tasks") return "Execution, risk, and evidence";
   if (route === "job-detail") return "Role setup and workflow checks";
   if (route === "jobs") return "流程与 Scorecard 设置";
   if (route === "assessments") return "Rubric and evidence";
@@ -1822,6 +1990,19 @@ function placeholderTabs(route: PlaceholderRoute): string[] {
 }
 
 function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): AgentContext {
+  if (route === "tasks") {
+    return {
+      recommendation: "Start with Critical and Today, then route waiting items so every recruiting action has an owner and evidence trail.",
+      evidence: [
+        { label: "Scope", value: "Applications, Inbox, Jobs, Assessments" },
+        { label: "Risk", value: "Waiting tasks can hide owner or SLA drift." },
+        { label: "Audit", value: "Completion records action, actor, and time." }
+      ],
+      ask: "Ask which task is blocking the recruiting flow, why it is critical, or what evidence supports the next action.",
+      approveLabel: "Complete",
+      reviewLabel: "Route"
+    };
+  }
   if (route === "assessments") {
     return {
       recommendation: "Move Trang Nguyen forward and skip additional assessment.",

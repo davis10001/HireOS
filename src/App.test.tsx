@@ -404,6 +404,49 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByText("Strong Yes: Architecture tradeoffs, debugging depth, API ownership")).toBeInTheDocument();
     expect(screen.getByText("Evidence Event")).toBeInTheDocument();
   });
+
+  it("opens Tasks, filters recruiting work, and records complete and route actions", async () => {
+    window.history.pushState({}, "", "/tasks");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tasks" })).toHaveClass("active");
+    expect(screen.getByText("Task Center")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Critical" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Waiting on Others" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Batch Review" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Critical" }));
+    expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
+    expect(screen.getByText("Source: Applications")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Waiting on Others" }));
+    expect(screen.getByText("Assessment submission follow-up")).toBeInTheDocument();
+    expect(screen.queryByText("Founder final interview approval")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    await user.click(screen.getByRole("button", { name: /open founder final interview approval/i }));
+    const detail = screen.getByRole("dialog", { name: /founder final interview approval/i });
+    expect(within(detail).getByText("AI recommendation")).toBeInTheDocument();
+    expect(within(detail).getByText("Risk")).toBeInTheDocument();
+    expect(within(detail).getByText("Evidence refs")).toBeInTheDocument();
+    expect(within(detail).getByText("Related objects")).toBeInTheDocument();
+
+    await user.click(within(detail).getByRole("button", { name: "Approve final interview" }));
+    expect(screen.getByText(/Completed action: Approve final interview/i)).toBeInTheDocument();
+    expect(screen.getByText(/Completed by: Linh Tran/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "All Tasks" }));
+    await user.click(screen.getByRole("button", { name: /open agency-forwarded duplicate review/i }));
+    const duplicateDetail = screen.getByRole("dialog", { name: /agency-forwarded duplicate review/i });
+    await user.click(within(duplicateDetail).getByRole("button", { name: "Route to HR review" }));
+    expect(screen.getByText(/Completed action: Route to HR review/i)).toBeInTheDocument();
+    expect(screen.getByText(/Routed to HR review by Linh Tran/i)).toBeInTheDocument();
+  });
 });
 
 async function login(user: ReturnType<typeof userEvent.setup>) {

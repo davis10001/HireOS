@@ -1362,6 +1362,10 @@ body.modal-open {
   grid-template-columns: minmax(190px, 1.35fr) minmax(86px, 0.75fr) minmax(82px, 0.7fr) minmax(106px, 0.9fr) minmax(96px, 0.75fr) minmax(118px, 0.8fr);
 }
 
+.tasks-table .table-row {
+  grid-template-columns: minmax(190px, 1.35fr) minmax(112px, 0.65fr) minmax(104px, 0.6fr) minmax(160px, 1fr) minmax(118px, 0.7fr) minmax(160px, 0.75fr);
+}
+
 .candidates-table .table-row {
   grid-template-columns: minmax(210px, 1.4fr) 110px 128px 120px 92px;
 }
@@ -1447,6 +1451,21 @@ body.modal-open {
 .row-actions button:hover {
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.tasks-page .secondary-tabs {
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.task-detail-modal {
+  width: min(980px, calc(100vw - 64px));
+}
+
+.task-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 16px;
 }
 
 .detail-grid .inbox-table .table-row {
@@ -2486,6 +2505,7 @@ body.dock-expanded .agent-dock-prompts {
   .jobs-table .table-row,
   .email-table .table-row,
   .apps-table .table-row,
+  .tasks-table .table-row,
   .candidates-table .table-row,
   .assessment-table .table-row,
   .blocked-table .table-row,
@@ -2655,6 +2675,7 @@ body.dock-expanded .agent-dock-prompts {
   .table,
   .table-row,
   .page-content > *,
+  .task-detail-grid,
   .cell-main,
   .card-copy {
     min-width: 0;
@@ -2665,10 +2686,15 @@ body.dock-expanded .agent-dock-prompts {
     overflow-x: auto;
   }
 
+  .task-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .table-row,
   .jobs-table .table-row,
   .email-table .table-row,
   .apps-table .table-row,
+  .tasks-table .table-row,
   .candidates-table .table-row,
   .assessment-table .table-row,
   .blocked-table .table-row,
