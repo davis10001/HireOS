@@ -87,6 +87,8 @@ type AgentContext = {
   recommendation: string;
   evidence: Array<{ label: string; value: string }>;
   ask: string;
+  approveLabel?: string;
+  reviewLabel?: string;
 };
 type PlaceholderRow = { item: string; state: string; owner: string; action: string; sla: string; note: string; warn?: boolean };
 type PlaceholderModule = { title: string; detail: string; rows: PlaceholderRow[] };
@@ -138,8 +140,8 @@ export default function App() {
     <AppShell
       activeRoute={shellActiveRoute(route)}
       agentContext={agentContext}
-      agentTitle={route === "jobs" || route === "job-detail" ? "岗位 Agent" : "HireOS Agent"}
-      agentSubtitle={route === "jobs" || route === "job-detail" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
+      agentTitle={route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
+      agentSubtitle={route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -318,7 +320,7 @@ function AppShell({
                 <div className="evidence-item" key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>
               ))}
             </div>
-            <div className="agent-actions"><button className="approve">应用</button><button className="review">审核</button></div>
+            <div className="agent-actions"><button className="approve">{agentContext.approveLabel ?? "应用"}</button><button className="review">{agentContext.reviewLabel ?? "审核"}</button></div>
           </section>
           <section className="agent-card"><h3>提问</h3><p>{agentContext.ask}</p></section>
         </div>
@@ -556,6 +558,8 @@ function JobCreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
 }
 
 function JobDetailPage({ job, onBack }: { job?: Job; onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<"candidates" | "details">("candidates");
+
   if (!job) {
     return (
       <>
@@ -573,25 +577,24 @@ function JobDetailPage({ job, onBack }: { job?: Job; onBack: () => void }) {
       </header>
       <section className="page-content">
         <div className="secondary-tabs">
-          <button className="secondary-tab active"><UsersRound aria-hidden="true" /> Candidate Members</button>
-          <button className="secondary-tab"><BriefcaseBusiness aria-hidden="true" /> Applications</button>
-          <button className="secondary-tab"><Sparkles aria-hidden="true" /> Evidence</button>
-          <button className="secondary-tab"><BriefcaseBusiness aria-hidden="true" /> 岗位详情</button>
+          <button className={`secondary-tab ${activeTab === "candidates" ? "active" : ""}`} type="button" onClick={() => setActiveTab("candidates")}><UsersRound aria-hidden="true" /> 候选人</button>
+          <button className={`secondary-tab ${activeTab === "details" ? "active" : ""}`} type="button" onClick={() => setActiveTab("details")}><BriefcaseBusiness aria-hidden="true" /> 岗位详情</button>
         </div>
-        <section className="metric-grid">
-          <Metric label="Job Status" value={statusLabel(job.status)} detail="Email match follows job status" />
-          <Metric label="Applications" value={String(job.applicationsCount)} detail={`${job.pendingReviewCount} pending review`} />
-          <Metric label="Workflow Gaps" value={String(job.blockedCount)} detail="Assessment rubric review" warning={job.blockedCount > 0} />
-        </section>
-        <section className="detail-grid">
-          <div className="detail-stack">
-            <section className="panel"><div className="panel-header"><div><h2>Candidate Members</h2><p>当前岗位下的候选人、流程状态、负责人和下一步动作。</p></div></div><div className="table apps-table"><div className="table-row header"><span>候选人</span><span>状态</span><span>负责人</span><span>下一步</span><span>SLA</span></div><div className="table-row"><div className="cell-main"><strong>Waiting for first application</strong><span>New manual applications will attach to this job baseline.</span></div><span>New Intake</span><span>{job.owner}</span><span>Review profile</span><span className="pill green">Ready</span></div></div></section>
-            <section className="panel"><div className="panel-header"><div><h2>Applications</h2><p>Application rows inherit job state, owner defaults, next action, SLA and timeline requirements.</p></div></div><div className="cards"><div className="work-card"><div className="card-top"><div className="card-copy"><strong>{job.applicationsCount} applications</strong><span>{job.pendingReviewCount} pending review · {job.blockedCount} workflow gaps</span></div><span className="pill">Job scope</span></div></div></div></section>
-            <section className="panel"><div className="panel-header"><div><h2>Evidence</h2><p>Evidence context remains available for later candidate and application modules.</p></div></div><div className="evidence-list"><div className="evidence-item"><span>Requirement</span><strong>{job.requirements}</strong></div><div className="evidence-item"><span>Generated summary</span><strong>{job.generatedSummary}</strong></div></div></section>
-            <section className="panel"><div className="panel-header"><div><h2>Job Overview</h2><p>创建岗位时填写，后续可修改并保留变更记录</p></div></div><div className="settings-grid"><article className="config-card"><h3>招聘需求</h3><p>{job.requirements}</p><div className="config-meta"><span className="pill green">{job.owner}</span><span className="pill">{job.location}</span></div></article><article className="config-card"><h3>预算与级别</h3><p>{job.salaryRange || "Budget pending"}</p><div className="config-meta"><span className="pill">{job.department}</span><span className="pill">{job.employmentType}</span></div></article></div></section>
-            <section className="panel"><div className="panel-header"><div><h2>Application Flow</h2><p>每个申请都会继承阶段、负责人、下一步和 SLA</p></div></div><div className="timeline"><TimelineStep index="01" title="HR Review" detail="Owner: Linh · SLA: 1 business day" status="就绪" /><TimelineStep index="02" title="Hiring Manager Review" detail="Evidence: role fit, scorecard, communication" status="就绪" /><TimelineStep index="03" title="Assessment" detail="Rubric is generated from the job scorecard" status="审核" warn /><TimelineStep index="04" title="Founder Decision" detail="Founder sees evidence, risk, and workflow history" status="就绪" /></div></section>
+        <section className={`unframed-section ${activeTab === "candidates" ? "" : "is-hidden"}`} data-job-detail-panel="candidates">
+          <div className="panel-header"><div><h2>候选人成员列表</h2><p>当前岗位下的候选人、流程状态、负责人和下一步动作</p></div></div>
+          <div className="table apps-table">
+            <div className="table-row header"><span>候选人</span><span>状态</span><span>负责人</span><span>下一步</span><span>SLA</span></div>
+            <button className="table-row table-row-button" type="button"><div className="cell-main"><strong>Trang Nguyen</strong><span>7 个证据事件 · 1 个测评</span></div><span>创始人审核</span><span>Founder</span><span>批准终面</span><span className="pill warn">今天</span></button>
+            <div className="table-row"><div className="cell-main"><strong>Anh Le</strong><span>面试反馈混合 · 存在证据缺口</span></div><span>面试</span><span>Mai Ho</span><span>收集反馈</span><span className="pill danger">逾期</span></div>
+            <div className="table-row"><div className="cell-main"><strong>Minh Pham</strong><span>Offer 证据完整</span></div><span>Offer 决策</span><span>Founder</span><span>决策</span><span className="pill green">就绪</span></div>
           </div>
-          <section className="panel"><div className="panel-header"><div><h2>Scorecard</h2><p>AI generated scorecard remains editable before activation.</p></div></div><div className="cards">{job.scorecard.map((criterion) => <div className="work-card" key={criterion}><div className="card-top"><div className="card-copy"><strong>{criterion}</strong><span>{job.generatedSummary}</span></div><span className="pill green">Ready</span></div></div>)}</div></section>
+        </section>
+        <section className={`detail-grid ${activeTab === "details" ? "" : "is-hidden"}`} data-job-detail-panel="details">
+          <div className="detail-stack">
+            <section className="panel"><div className="panel-header"><div><h2>招聘需求</h2><p>创建岗位时填写，后续可修改并保留变更记录</p></div></div><div className="settings-grid"><article className="config-card"><h3>岗位目标</h3><p>{job.requirements}</p><div className="config-meta"><span className="pill green">创始人已确认</span><span className="pill">{job.location}</span></div></article><article className="config-card"><h3>预算与级别</h3><p>{job.salaryRange || "高级个人贡献者，5 年以上经验，越南薪资带，要求英文协作。"}</p><div className="config-meta"><span className="pill">{job.department}</span><span className="pill">{job.employmentType}</span></div></article></div></section>
+            <section className="panel"><div className="panel-header"><div><h2>已配置流程</h2><p>每个申请都会继承阶段、负责人、下一步和 SLA</p></div></div><div className="timeline"><TimelineStep index="01" title="HR 审核" detail="负责人：Linh · SLA：1 个工作日 · 验证基础匹配" status="就绪" /><TimelineStep index="02" title="技术面试" detail="负责人：技术负责人 · 证据：架构、调试、沟通" status="就绪" /><TimelineStep index="03" title="测评" detail="负责人：HR + 技术负责人 · 评分标准待审核" status="审核" warn /><TimelineStep index="04" title="创始人决策" detail="创始人查看完整证据、缺口和异常流程历史" status="就绪" /></div></section>
+          </div>
+          <section className="panel"><div className="panel-header"><div><h2>邮件匹配规则</h2><p>邮箱数据如何进入该岗位</p></div></div><div className="cards"><div className="work-card"><div className="card-top"><div className="card-copy"><strong>允许自动匹配</strong><span>只有活跃岗位会接收招聘邮箱中的高置信度 CV 匹配。</span></div><span className="pill green">On</span></div></div><div className="work-card"><div className="card-top"><div className="card-copy"><strong>匹配置信度阈值</strong><span>候选人、岗位和附件证据超过 85% 后才可自动创建申请。</span></div><span className="pill">85%</span></div></div><div className="work-card"><div className="card-top"><div className="card-copy"><strong>低置信度兜底</strong><span>模糊 CV 进入待办箱由 HR 确认，而不是静默创建数据。</span></div><span className="pill warn">待办箱</span></div></div></div></section>
         </section>
       </section>
     </>
@@ -732,14 +735,15 @@ function placeholderTabs(route: PlaceholderRoute): string[] {
 function buildAgentContext(route: RouteId, job?: Job): AgentContext {
   if (route === "job-detail" && job) {
     return {
-      recommendation: `Review ${job.title} before expanding candidate intake. Confirm owner defaults, SLA, and scorecard evidence are ready.`,
+      recommendation: "Review the Assessment rubric before sending another case, then keep the job Active.",
       evidence: [
-        { label: "Selected job", value: job.title },
-        { label: "Status", value: statusLabel(job.status) },
-        { label: "Owner", value: job.owner },
-        { label: "Risk", value: job.blockedCount > 0 ? `${job.blockedCount} workflow gap needs review` : "No active workflow gaps" }
+        { label: "Evidence", value: "Scorecard is 92% covered; rubric has one incomplete dimension." },
+        { label: "Risk", value: "Weak rubric will reduce assessment evidence quality." },
+        { label: "Confidence", value: "High · based on workflow configuration." }
       ],
-      ask: `Ask about ${job.title} workflow gaps, scorecard edits, or activation readiness.`
+      ask: `Ask about ${job.title} role setup, workflow checks, or assessment rubric quality.`,
+      approveLabel: "Draft rubric",
+      reviewLabel: "Review"
     };
   }
   if (route === "jobs") {

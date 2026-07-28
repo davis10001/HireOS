@@ -736,6 +736,19 @@ body.sidebar-collapsed .user-status {
   background: var(--surface);
 }
 
+.table-row-button {
+  width: 100%;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.table-row-button:hover {
+  background: var(--surface-soft);
+}
+
 .table-row > * {
   min-width: 0;
 }

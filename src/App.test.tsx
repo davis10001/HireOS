@@ -107,15 +107,20 @@ describe("Login + Jobs prototype slice", () => {
 
     await user.click(screen.getByRole("button", { name: /open revenue analyst/i }));
     expect(screen.getByRole("heading", { name: "Revenue Analyst" })).toBeInTheDocument();
-    expect(screen.getByText("Job Overview")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Candidate Members" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Applications" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Evidence" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Scorecard" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Application Flow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /候选人/i })).toHaveClass("active");
+    expect(screen.getByRole("heading", { name: "候选人成员列表" })).toBeInTheDocument();
+    expect(screen.getByText("Trang Nguyen")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "邮件匹配规则" }).closest(".detail-grid")).toHaveClass("is-hidden");
+
+    await user.click(screen.getByRole("button", { name: /岗位详情/i }));
+    expect(screen.getByRole("button", { name: /岗位详情/i })).toHaveClass("active");
+    expect(screen.getByRole("heading", { name: "招聘需求" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "已配置流程" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "邮件匹配规则" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "邮件匹配规则" }).closest(".detail-grid")).not.toHaveClass("is-hidden");
     const agent = screen.getByLabelText("Agent 对话区");
-    expect(within(agent).getByText("Selected job")).toBeInTheDocument();
-    expect(within(agent).getByText("Revenue Analyst")).toBeInTheDocument();
+    expect(within(agent).getByText("Job AI Workspace")).toBeInTheDocument();
+    expect(within(agent).getByText("Review the Assessment rubric before sending another case, then keep the job Active.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /account menu/i }));
     await user.click(screen.getByRole("button", { name: /sign out/i }));
