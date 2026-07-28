@@ -90,6 +90,7 @@ type PlaceholderRoute = Exclude<RouteId, "dashboard" | "jobs" | "job-detail">;
 const JOBS_KEY = "hireos.jobs";
 const CANDIDATES_KEY = "hireos.candidates";
 const APPLICATIONS_KEY = "hireos.applications";
+const LANGUAGE_KEY = "hireos.language";
 
 const placeholderLabels: Record<PlaceholderRoute, string> = {
   "application-detail": "Application Detail",
@@ -115,6 +116,50 @@ type AgentContext = {
 };
 type PlaceholderRow = { item: string; state: string; owner: string; action: string; sla: string; note: string; warn?: boolean };
 type PlaceholderModule = { title: string; detail: string; rows: PlaceholderRow[] };
+type Language = "EN" | "中文";
+
+const appCopy = {
+  EN: {
+    accountMenu: "User menu for",
+    activeJobs: "Active Jobs",
+    analytics: "Analytics",
+    applications: "Applications",
+    candidates: "Candidates",
+    candidatesDescription: "Reusable candidate profiles, contact information, CV history, deduplication and cross-job history.",
+    dashboard: "Dashboard",
+    importCv: "Import CV",
+    inbox: "Inbox",
+    intelligence: "Intelligence",
+    jobs: "Jobs",
+    jobsDescription: "Job status, job tags, job members, hiring workflow and job-level metrics.",
+    language: "Language",
+    newCandidate: "New Candidate",
+    newJob: "New Job",
+    operate: "Operate",
+    settings: "Settings",
+    signOut: "Sign out"
+  },
+  中文: {
+    accountMenu: "用户菜单",
+    activeJobs: "活跃岗位",
+    analytics: "分析",
+    applications: "申请流程",
+    candidates: "候选人",
+    candidatesDescription: "可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。",
+    dashboard: "看板",
+    importCv: "导入简历",
+    inbox: "待办箱",
+    intelligence: "智能",
+    jobs: "岗位",
+    jobsDescription: "岗位状态、岗位 Tag、岗位成员、招聘流程和岗位级统计。",
+    language: "语言",
+    newCandidate: "新建候选人",
+    newJob: "新建岗位",
+    operate: "运营",
+    settings: "设置",
+    signOut: "退出登录"
+  }
+} satisfies Record<Language, Record<string, string>>;
 
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadAuthState());
@@ -124,6 +169,7 @@ export default function App() {
   const [candidates, setCandidates] = useState<Candidate[]>(loadCandidates);
   const [applications, setApplications] = useState<Application[]>(loadApplications);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
+  const [language, setLanguage] = useState<Language>(loadLanguage);
 
   useEffect(() => {
     saveJobs(jobs);
@@ -210,6 +256,11 @@ export default function App() {
       agentContext={agentContext}
       agentTitle={route === "application-detail" ? "申请 AI 工作区" : route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
       agentSubtitle={route === "application-detail" ? "候选人、流程状态和下一步" : route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
+      language={language}
+      onLanguageChange={(nextLanguage) => {
+        setLanguage(nextLanguage);
+        saveLanguage(nextLanguage);
+      }}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -224,6 +275,7 @@ export default function App() {
       {route === "jobs" ? (
         <JobsPage
           jobs={jobs}
+          language={language}
           onCreateJob={(job) => setJobs((current) => [job, ...current])}
           onOpenJob={(jobId) => {
             navigate("job-detail", jobId);
@@ -243,8 +295,8 @@ export default function App() {
           onResolveDuplicate={resolveDuplicateCandidate}
         />
       ) : null}
-      {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
-      {route === "applications" ? <ApplicationsPage applications={applications} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
+      {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} language={language} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
+      {route === "applications" ? <ApplicationsPage applications={applications} language={language} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
       {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} candidate={selectedApplicationCandidate} /> : null}
       {isPlaceholderRoute(route) && route !== "application-detail" && route !== "applications" && route !== "candidates" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
@@ -317,6 +369,8 @@ function AppShell({
   agentTitle,
   agentSubtitle,
   children,
+  language,
+  onLanguageChange,
   onNavigate,
   onSignOut,
   session
@@ -326,6 +380,8 @@ function AppShell({
   agentTitle: string;
   agentSubtitle: string;
   children: ReactNode;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
   onNavigate: (route: ShellNavRoute) => void;
   onSignOut: () => void;
   session: AuthSession;
@@ -334,13 +390,7 @@ function AppShell({
   const [agentCollapsed, setAgentCollapsed] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
-  const [language, setLanguage] = useState<"EN" | "中文">(() => {
-    try {
-      return window.localStorage.getItem("hireos.language") === "中文" ? "中文" : "EN";
-    } catch {
-      return "EN";
-    }
-  });
+  const copy = appCopy[language];
 
   useEffect(() => {
     document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
@@ -350,11 +400,6 @@ function AppShell({
       document.body.classList.remove("sidebar-collapsed", "agent-collapsed", "dock-expanded");
     };
   }, [sidebarCollapsed, agentCollapsed, dockOpen]);
-
-  function chooseLanguage(nextLanguage: "EN" | "中文") {
-    setLanguage(nextLanguage);
-    window.localStorage.setItem("hireos.language", nextLanguage);
-  }
 
   return (
     <div className="app-shell">
@@ -367,23 +412,23 @@ function AppShell({
           </button>
         </div>
 
-        <div className="nav-section">Operate</div>
+        <div className="nav-section">{copy.operate}</div>
         <nav className="nav">
-          <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label="Dashboard" onClick={() => onNavigate("dashboard")} />
-          <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label="Jobs" onClick={() => onNavigate("jobs")} />
-          <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label="Candidates" onClick={() => onNavigate("candidates")} />
-          <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label="Applications" onClick={() => onNavigate("applications")} />
-          <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label="Inbox" onClick={() => onNavigate("inbox")} />
+          <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label={copy.dashboard} onClick={() => onNavigate("dashboard")} />
+          <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label={copy.jobs} onClick={() => onNavigate("jobs")} />
+          <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label={copy.candidates} onClick={() => onNavigate("candidates")} />
+          <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label={copy.applications} onClick={() => onNavigate("applications")} />
+          <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label={copy.inbox} onClick={() => onNavigate("inbox")} />
         </nav>
-        <div className="nav-section">Intelligence</div>
+        <div className="nav-section">{copy.intelligence}</div>
         <nav className="nav">
-          <NavButton active={activeRoute === "analytics"} icon={<ChartNoAxesCombined />} label="Analytics" onClick={() => onNavigate("analytics")} />
-          <NavButton active={activeRoute === "settings"} icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
+          <NavButton active={activeRoute === "analytics"} icon={<ChartNoAxesCombined />} label={copy.analytics} onClick={() => onNavigate("analytics")} />
+          <NavButton active={activeRoute === "settings"} icon={<Settings />} label={copy.settings} onClick={() => onNavigate("settings")} />
         </nav>
         <div className="sidebar-footer">
           <div
             aria-expanded={accountOpen}
-            aria-label={`User menu for ${session.name}`}
+            aria-label={`${copy.accountMenu} ${session.name}`}
             className="user-status"
             onClick={() => setAccountOpen((value) => !value)}
             onKeyDown={(event) => {
@@ -412,13 +457,13 @@ function AppShell({
           </div>
           <div className={`account-menu ${accountOpen ? "is-open" : ""}`}>
             <div className="language-switch" aria-label="语言切换">
-              <span>语言</span>
+              <span>{copy.language}</span>
               <div>
-                <button aria-pressed={language === "EN"} className={language === "EN" ? "active" : ""} onClick={() => chooseLanguage("EN")} type="button">EN</button>
-                <button aria-pressed={language === "中文"} className={language === "中文" ? "active" : ""} onClick={() => chooseLanguage("中文")} type="button">中文</button>
+                <button aria-pressed={language === "EN"} className={language === "EN" ? "active" : ""} onClick={() => onLanguageChange("EN")} type="button">EN</button>
+                <button aria-pressed={language === "中文"} className={language === "中文" ? "active" : ""} onClick={() => onLanguageChange("中文")} type="button">中文</button>
               </div>
             </div>
-            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> 退出登录</button>
+            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> {copy.signOut}</button>
           </div>
         </div>
       </aside>
@@ -507,17 +552,18 @@ function DashboardPage() {
   );
 }
 
-function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: (job: Job) => void; onOpenJob: (jobId: string) => void }) {
+function JobsPage({ jobs, language, onCreateJob, onOpenJob }: { jobs: Job[]; language: Language; onCreateJob: (job: Job) => void; onOpenJob: (jobId: string) => void }) {
   const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
   const metrics = buildJobMetrics(jobs);
   const filteredJobs = statusFilter === "all" ? jobs : jobs.filter((job) => job.status === statusFilter);
+  const copy = appCopy[language];
 
   return (
     <>
       <header className="topbar">
-        <div className="page-title"><h1>Jobs</h1><p>岗位状态、岗位 Tag、岗位成员、招聘流程和岗位级统计。</p></div>
-        <div className="top-actions"><button className="primary-button" onClick={() => setModalOpen(true)} type="button"><Plus aria-hidden="true" /> New Job</button></div>
+        <div className="page-title"><h1>{copy.jobs}</h1><p>{copy.jobsDescription}</p></div>
+        <div className="top-actions"><button className="primary-button" onClick={() => setModalOpen(true)} type="button"><Plus aria-hidden="true" /> {copy.newJob}</button></div>
       </header>
       <section className="page-content">
         <section className="filter-strip" aria-label="岗位筛选">
@@ -540,7 +586,7 @@ function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: 
           </div>
         </section>
         <section className="metric-grid">
-          <Metric label="Active Jobs" value={String(metrics.active)} detail={`${metrics.total} total roles`} />
+          <Metric label={copy.activeJobs} value={String(metrics.active)} detail={`${metrics.total} total roles`} />
           <Metric label="Paused Jobs" value={String(metrics.paused)} detail="Not receiving auto matches" />
           <Metric label="JD Drafts" value={String(metrics.draft)} detail="Need confirmation" />
           <Metric label="Workflow Gaps" value={String(metrics.blocked)} detail="Scorecard or SLA incomplete" warning />
@@ -678,19 +724,20 @@ function JobCreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   );
 }
 
-function CandidatesPage({ applications, candidates, jobs, onCreateCandidate, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; jobs: Job[]; onCreateCandidate: (candidate: Candidate) => void; onResolveDuplicate: (candidateId: string) => void }) {
+function CandidatesPage({ applications, candidates, jobs, language, onCreateCandidate, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; jobs: Job[]; language: Language; onCreateCandidate: (candidate: Candidate) => void; onResolveDuplicate: (candidateId: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false);
   const assigned = candidates.filter((candidate) => candidate.allocationState === "assigned");
   const unassigned = candidates.filter((candidate) => candidate.allocationState === "unassigned_pool");
   const notFit = candidates.filter((candidate) => candidate.allocationState === "not_fit_current_job" || candidate.allocationState === "rejected_global");
   const duplicates = candidates.filter((candidate) => candidate.allocationState === "duplicate_review");
+  const copy = appCopy[language];
 
   return (
     <>
-      <header className="topbar"><div className="page-title"><h1>Candidates</h1><p>可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。</p></div><div className="top-actions"><button className="ghost-button" type="button">Import CV</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> New Candidate</button></div></header>
+      <header className="topbar"><div className="page-title"><h1>{copy.candidates}</h1><p>{copy.candidatesDescription}</p></div><div className="top-actions"><button className="ghost-button" type="button">{copy.importCv}</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> {copy.newCandidate}</button></div></header>
       <section className="page-content">
         <div className="hero-row"><section className="hero-panel"><h2>Candidate is the person record. Applications keep the job-specific process separate.</h2><p>This prevents one candidate's multiple role histories from collapsing into a single vague status.</p></section><section className="hero-panel ai"><h2>Deduplication insight</h2><p>{duplicates.length} profiles need HR review before they can be assigned to a Job.</p></section></div>
-        <section className="metric-grid"><Metric label="Candidates" value={String(candidates.length)} detail={`${applications.length} job-bound applications`} /><Metric label="Assigned" value={String(assigned.length)} detail="Have at least one Application" /><Metric label="Unassigned" value={String(unassigned.length)} detail="People pool, no pipeline entry" /><Metric label="Duplicates" value={String(duplicates.length)} detail="Blocked from assignment" warning={duplicates.length > 0} /></section>
+        <section className="metric-grid"><Metric label={copy.candidates} value={String(candidates.length)} detail={`${applications.length} job-bound applications`} /><Metric label="Assigned" value={String(assigned.length)} detail="Have at least one Application" /><Metric label="Unassigned" value={String(unassigned.length)} detail="People pool, no pipeline entry" /><Metric label="Duplicates" value={String(duplicates.length)} detail="Blocked from assignment" warning={duplicates.length > 0} /></section>
         <section className="panel"><div className="panel-header"><div><h2>Candidate Registry</h2><p>Identity, source, CV history, and cross-job context</p></div><div className="tabs"><button className="tab active" type="button">All</button><button className="tab" type="button">Duplicates</button><button className="tab" type="button">High value</button></div></div><CandidateTable candidates={candidates} applications={applications} /></section>
         <section className="content-grid">
           <CandidatePoolPanel title="Assigned Candidates" detail="Candidates with one or more Job-bound Applications" candidates={assigned} applications={applications} empty="No assigned candidates yet." />
@@ -846,12 +893,15 @@ function JobDetailPage({ applications, candidates, job, onAttachCandidate, onBac
   );
 }
 
-function ApplicationsPage({ applications, onOpenApplication }: { applications: Application[]; onOpenApplication: (applicationId: string) => void }) {
+function ApplicationsPage({ applications, language, onOpenApplication }: { applications: Application[]; language: Language; onOpenApplication: (applicationId: string) => void }) {
+  const copy = appCopy[language];
+  const tabs = [copy.applications, "Candidate Profile", "Timeline", "Email Threads", "Interviews", "Assessments", "Decisions"];
+
   return (
     <>
-      <header className="topbar"><div className="page-title"><h1>Applications</h1><p>Pipeline Workbench with State, Owner, Next Action, SLA, timeline and owner load.</p></div></header>
+      <header className="topbar"><div className="page-title"><h1>{copy.applications}</h1><p>Pipeline Workbench with State, Owner, Next Action, SLA, timeline and owner load.</p></div></header>
       <section className="page-content">
-        <div className="secondary-tabs">{["Applications", "Candidate Profile", "Timeline", "Email Threads", "Interviews", "Assessments", "Decisions"].map((tab, index) => <button className={`secondary-tab ${index === 0 ? "active" : ""}`} type="button" key={tab}>{tab}</button>)}</div>
+        <div className="secondary-tabs">{tabs.map((tab, index) => <button className={`secondary-tab ${index === 0 ? "active" : ""}`} type="button" key={tab}>{tab}</button>)}</div>
         <section className="metric-grid"><Metric label="Open Applications" value={String(applications.length)} detail="Created only after Candidate + Job binding" /><Metric label="Due Today" value={String(applications.filter((app) => app.slaStatus === "Today").length)} detail="SLA scan" warning={applications.some((app) => app.slaStatus === "Today")} /><Metric label="Owner Load" value={String(new Set(applications.map((app) => app.currentOwner)).size)} detail="Active owners" /><Metric label="Timeline Events" value={String(applications.reduce((sum, app) => sum + app.timeline.length, 0))} detail="Application history" /></section>
         <section className="panel"><div className="panel-header"><div><h2>Pipeline Workbench</h2><p>State, Owner, Next Action, and SLA stay visible together.</p></div></div><div className="table apps-table workflow-table"><div className="table-row header"><span>Application</span><span>State</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>{applications.map((application) => <div className="table-row" key={application.id}><div className="cell-main"><strong>{application.candidateName}</strong><span>{application.jobTitle}</span></div><span>{application.currentState}</span><span>{application.currentOwner}</span><span>{application.nextAction}</span><span className={`pill ${application.slaStatus === "Today" ? "warn" : "green"}`}>{application.slaStatus} · {new Date(application.dueAt).toLocaleDateString("en-CA")}</span><button className="ghost-button row-action" type="button" onClick={() => onOpenApplication(application.id)}>Open Application for {application.candidateName}</button></div>)}</div>{applications.length === 0 ? <div className="empty-state">No Applications yet. Attach a Candidate to an Active Job first.</div> : null}</section>
         <section className="content-grid"><section className="panel"><div className="panel-header"><div><h2>Application Timeline</h2><p>Every created Application writes an initial timeline event.</p></div></div><div className="timeline">{applications.flatMap((application) => application.timeline.map((event) => <TimelineStep key={event.id} index={application.currentState} title={event.title} detail={`${application.candidateName} · ${event.detail}`} status={application.slaStatus} warn={application.slaStatus !== "Ready"} />))}</div></section><section className="panel"><div className="panel-header"><div><h2>Owner Load</h2><p>Owner and process accountability stay visible.</p></div></div><div className="cards">{Array.from(new Set(applications.map((application) => application.currentOwner))).map((owner) => <div className="work-card" key={owner}><div className="card-top"><div className="card-copy"><strong>{owner}</strong><span>{applications.filter((application) => application.currentOwner === owner).length} active applications</span></div><span className="pill green">Active</span></div></div>)}</div></section></section>
@@ -1059,6 +1109,22 @@ function loadApplications(): Application[] {
 
 function saveApplications(applications: Application[]) {
   saveLocalState(APPLICATIONS_KEY, applications);
+}
+
+function loadLanguage(): Language {
+  try {
+    return window.localStorage.getItem(LANGUAGE_KEY) === "中文" ? "中文" : "EN";
+  } catch {
+    return "EN";
+  }
+}
+
+function saveLanguage(language: Language) {
+  try {
+    window.localStorage.setItem(LANGUAGE_KEY, language);
+  } catch {
+    // Local persistence is best-effort for the prototype slice.
+  }
 }
 
 function loadLocalState<T>(key: string, fallback: T): T {

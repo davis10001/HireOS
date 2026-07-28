@@ -29,25 +29,32 @@ describe("Login + Jobs prototype slice", () => {
   });
 
   it("opens account menu from the avatar area, switches language, and signs out", async () => {
+    window.history.pushState({}, "", "/candidates");
     const user = userEvent.setup();
     const { unmount } = renderApp();
 
     await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
     await user.type(screen.getByLabelText(/password/i), "secret1");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
+    expect(screen.getByRole("heading", { name: "Candidates" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /user menu for linh tran/i }));
     const languageSwitch = screen.getByLabelText("语言切换");
-    expect(within(languageSwitch).getByText("语言")).toBeInTheDocument();
+    expect(within(languageSwitch).getByText("Language")).toBeInTheDocument();
     expect(within(languageSwitch).getByRole("button", { name: "EN" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(within(languageSwitch).getByRole("button", { name: "中文" }));
     expect(within(languageSwitch).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "候选人" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "岗位" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "申请流程" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建候选人" })).toBeInTheDocument();
 
     unmount();
     renderApp();
-    await user.click(screen.getByRole("button", { name: /user menu for linh tran/i }));
+    await user.click(screen.getByRole("button", { name: /用户菜单 linh tran/i }));
     expect(within(screen.getByLabelText("语言切换")).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "候选人" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "退出登录" }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
@@ -149,7 +156,7 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(agent).getByText("Review the Assessment rubric before sending another case, then keep the job Active.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /account menu/i }));
-    await user.click(screen.getByRole("button", { name: "退出登录" }));
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
   });
 
