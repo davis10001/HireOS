@@ -295,7 +295,7 @@ describe("Login + Jobs prototype slice", () => {
 
     expect(screen.getByRole("heading", { name: "Candidates" })).toBeInTheDocument();
     expect(screen.getByText("Candidate Registry")).toBeInTheDocument();
-    expect(screen.getByText("Duplicate Review")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Duplicate Review" })).toBeInTheDocument();
     expect(screen.getByText("Quang Do / Q. Do")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /queue duplicate review for quang do/i }));

@@ -32,7 +32,15 @@ export interface ApplicationTimelineEvent {
     | "not_fit_current_job"
     | "interview_scheduled"
     | "interview_completed"
-    | "evidence_event";
+    | "evidence_event"
+    | "assessment_draft_created"
+    | "assessment_ready"
+    | "assessment_sent"
+    | "assessment_submission"
+    | "assessment_parsed"
+    | "assessment_review"
+    | "assessment_stop_rule"
+    | "assessment_completed";
   title: string;
   detail: string;
   actor: string;
