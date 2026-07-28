@@ -56,31 +56,31 @@ export interface InboxReviewState {
 
 export const seedEmailThreads: EmailThreadSeam[] = [
   {
-    id: "thread-trang-cv",
-    subject: "CV - Trang Nguyen Backend",
-    sender: "trang.nguyen@mail.vn · 3 attachments",
+    id: "thread-sophia-cv",
+    subject: "CV - Sophia Chen Finance Director",
+    sender: "sophia.chen@mail.vn · CV + board memo sample",
     detectedType: "CV Intake",
-    jobMatch: "Backend 94%",
+    jobMatch: "Finance Director 94%",
     aiAction: "Prepare intake seam",
     status: "auto_applied",
     confidence: 0.94
   },
   {
     id: "thread-agency-forward",
-    subject: "Forwarded profile from agency",
-    sender: "agency-intake@company.vn · CV_Quang_Backend.pdf",
+    subject: "Forwarded finance associate profile from agency",
+    sender: "agency-intake@company.vn · CV_Vivian_Investment.pdf",
     detectedType: "Agency Forward",
-    jobMatch: "Platform 62%",
+    jobMatch: "Strategic Investment Associate 62%",
     aiAction: "Ask HR",
     status: "needs_review",
     confidence: 0.62
   },
   {
-    id: "thread-assessment-v2",
-    subject: "Assessment submission v2",
-    sender: "Minh Pham · zip + README",
+    id: "thread-investment-assessment",
+    subject: "Investment memo assessment submission",
+    sender: "Minh Anh Vo · model.xlsx + memo.pdf",
     detectedType: "Assessment",
-    jobMatch: "GTM 86%",
+    jobMatch: "Strategic Investment Associate 86%",
     aiAction: "Attach evidence preview",
     status: "draft",
     confidence: 0.86
@@ -93,16 +93,16 @@ export const seedAiActions: AiActionSeam[] = [
     actionType: "Match",
     status: "pending_approval",
     confidence: 0.72,
-    inputRefs: ["thread-agency-forward", "attachment-cv-quang"],
-    evidenceRefs: ["evidence-phone-match", "evidence-job-keywords"],
-    outputSummary: "Possible duplicate identity with medium confidence; do not merge automatically."
+    inputRefs: ["thread-agency-forward", "attachment-cv-vivian"],
+    evidenceRefs: ["evidence-phone-match", "evidence-investment-keywords"],
+    outputSummary: "Possible duplicate identity with medium confidence; do not merge or assign automatically."
   }
 ];
 
 export const seedInboxItems: InboxItemSeam[] = [
   {
     id: "inbox-agency-forward",
-    title: "Agency-forwarded profile",
+    title: "Agency-forwarded finance profile",
     type: "Email Intake",
     object: "Candidate Seam",
     status: "open",
@@ -111,8 +111,9 @@ export const seedInboxItems: InboxItemSeam[] = [
     aiActionId: "ai-agency-match",
     rawEvidence: [
       "Original agency email remains attached",
-      "CV_Quang_Backend.pdf parse status: Parsed",
-      "Phone number matches an existing backend profile"
+      "CV_Vivian_Investment.pdf parse status: Parsed",
+      "Phone number matches an existing investment associate profile",
+      "Industry keywords match, but English memo evidence is missing"
     ],
     recommendation: "Route to HR review before any Candidate merge or Application creation.",
     writebackPreview: [
@@ -125,16 +126,16 @@ export const seedInboxItems: InboxItemSeam[] = [
 
 export const seedDuplicateSignals: DuplicateSignalSeam[] = [
   {
-    id: "duplicate-quang",
-    candidateLabel: "Quang Do / Q. Do",
-    matchReason: "Same phone number, different agency email, CV skill section 89% overlap.",
+    id: "duplicate-vivian",
+    candidateLabel: "Vivian Tran / V. Tran",
+    matchReason: "Same phone number, different agency email, finance deal list 89% overlap.",
     confidence: 0.72,
     status: "review",
-    evidence: ["Phone exact match", "Agency source differs", "CV overlap 89%"]
+    evidence: ["Phone exact match", "Agency source differs", "Deal list overlap 89%"]
   },
   {
-    id: "duplicate-mai",
-    candidateLabel: "Mai Nguyen / M. Nguyen",
+    id: "duplicate-ella",
+    candidateLabel: "Ella Park / E. Park",
     matchReason: "Email alias match and same attachment hash.",
     confidence: 0.91,
     status: "hold",

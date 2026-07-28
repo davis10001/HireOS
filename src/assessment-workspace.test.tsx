@@ -31,21 +31,21 @@ describe("Assessment workspace prototype parity", () => {
     await user.click(screen.getByRole("button", { name: "Create Assessment Draft" }));
     const dialog = screen.getByRole("dialog", { name: "Create Assessment Draft" });
     await user.clear(within(dialog).getByLabelText("Assessment title"));
-    await user.type(within(dialog).getByLabelText("Assessment title"), "Backend evidence gap case");
+    await user.type(within(dialog).getByLabelText("Assessment title"), "Investment evidence gap case");
     await user.clear(within(dialog).getByLabelText("Prompt"));
     await user.type(within(dialog).getByLabelText("Prompt"), "Review an event-driven API failure and propose a rollback plan.");
     await user.click(within(dialog).getByRole("button", { name: "Create Draft" }));
 
-    expect(screen.getAllByText("Backend evidence gap case").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: "Mark Backend evidence gap case ready to send" }));
+    expect(screen.getAllByText("Investment evidence gap case").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Mark Investment evidence gap case ready to send" }));
     await user.click(screen.getByRole("button", { name: "Sent" }));
-    await user.click(screen.getByRole("button", { name: "Send Backend evidence gap case" }));
-    await user.click(screen.getByRole("button", { name: "Record submission for Backend evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Send Investment evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Record submission for Investment evidence gap case" }));
     await user.click(screen.getByRole("button", { name: "Review" }));
-    await user.click(screen.getByRole("button", { name: "Parse submission for Backend evidence gap case" }));
-    await user.click(screen.getByRole("button", { name: "Start review for Backend evidence gap case" }));
-    await user.click(screen.getByRole("button", { name: "Accept Stop Rule for Backend evidence gap case" }));
-    await user.click(screen.getByRole("button", { name: "Complete Backend evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Parse submission for Investment evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Start review for Investment evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Accept Stop Rule for Investment evidence gap case" }));
+    await user.click(screen.getByRole("button", { name: "Complete Investment evidence gap case" }));
 
     expect(screen.getAllByText("Complete").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Rubric match 88%").length).toBeGreaterThan(0);
@@ -54,9 +54,9 @@ describe("Assessment workspace prototype parity", () => {
 
     await user.click(screen.getByRole("button", { name: "Applications" }));
     expect(screen.getByText("Assessment completed")).toBeInTheDocument();
-    expect(screen.getAllByText(/Backend evidence gap case/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Investment evidence gap case/).length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
+    await user.click(screen.getByRole("button", { name: /open application for sophia chen/i }));
     expect(screen.getAllByText("Assessment completed").length).toBeGreaterThan(0);
     expect(screen.getByText(/HR calibrated rubric and accepted the stop rule/)).toBeInTheDocument();
   });

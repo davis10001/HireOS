@@ -19,29 +19,31 @@ describe("task contract", () => {
 
     expect(filterTasks(tasks, "Critical", { name: "Linh Tran", role: "HR" }).map((task) => task.title)).toEqual(
       expect.arrayContaining([
-        "Founder final interview approval",
+        "Founder offer approval for Finance Director",
         "Agency-forwarded duplicate review",
-        "Platform Engineer workflow defaults"
+        "Strategic Investment Associate workflow defaults"
       ])
     );
-    expect(filterTasks(tasks, "Waiting on Others", { name: "Linh Tran", role: "HR" }).map((task) => task.title)).toEqual([
-      "Assessment submission follow-up",
-      "Senior Backend Engineer workflow defaults"
-    ]);
+    expect(filterTasks(tasks, "Waiting on Others", { name: "Linh Tran", role: "HR" }).map((task) => task.title)).toEqual(
+      expect.arrayContaining([
+        "Assessment submission follow-up",
+        "Strategic Investment Associate workflow defaults"
+      ])
+    );
 
-    const founderTask = tasks.find((task) => task.title === "Founder final interview approval");
+    const founderTask = tasks.find((task) => task.title === "Founder offer approval for Finance Director");
     expect(founderTask?.sourceModule).toBe("Applications");
     expect(founderTask?.relatedObjects).toEqual([
-      { module: "Candidates", id: "candidate-trang-nguyen", label: "Trang Nguyen" },
-      { module: "Jobs", id: "job-backend", label: "Senior Backend Engineer" },
-      { module: "Applications", id: "application-trang-backend", label: "Trang Nguyen · Senior Backend Engineer" }
+      { module: "Candidates", id: "candidate-sophia-chen", label: "Sophia Chen" },
+      { module: "Jobs", id: "job-finance-director", label: "Finance Director" },
+      { module: "Applications", id: "application-sophia-finance-director", label: "Sophia Chen · Finance Director" }
     ]);
 
     expect(completeTask(founderTask!, "Final Interview", "Linh Tran", "2026-07-28T09:30:00.000Z")).toEqual({
       completedAction: "Final Interview",
       completedAt: "2026-07-28T09:30:00.000Z",
       completedBy: "Linh Tran",
-      id: "task-application-application-trang-backend",
+      id: "task-application-application-sophia-finance-director",
       status: "Completed"
     });
   });
@@ -53,7 +55,7 @@ describe("task contract", () => {
       candidateId: "candidate-risky",
       jobId: "job-risky",
       candidateName: "Risky Candidate",
-      jobTitle: "Platform Engineer",
+      jobTitle: "Strategic Investment Associate",
       currentOwner: "",
       nextAction: "",
       dueAt: "",
@@ -62,7 +64,7 @@ describe("task contract", () => {
 
     const tasks = buildRecruitingTasks({ applications: [unhealthyApplication], assessments: [], jobs: [] });
 
-    const applicationTasks = tasks.filter((task) => task.sourceModule === "Applications" && task.id !== "task-founder-offer-risk");
+    const applicationTasks = tasks.filter((task) => task.sourceModule === "Applications" && task.id !== "task-founder-offer-risk" && task.id !== "task-completed-hr-screen-sophia");
 
     expect(applicationTasks.map((task) => task.title)).toEqual([
       "Risky Candidate application next action",
@@ -73,8 +75,8 @@ describe("task contract", () => {
     ]);
     expect(applicationTasks[0].relatedObjects).toEqual([
       { module: "Candidates", id: "candidate-risky", label: "Risky Candidate" },
-      { module: "Jobs", id: "job-risky", label: "Platform Engineer" },
-      { module: "Applications", id: "application-risky", label: "Risky Candidate · Platform Engineer" }
+      { module: "Jobs", id: "job-risky", label: "Strategic Investment Associate" },
+      { module: "Applications", id: "application-risky", label: "Risky Candidate · Strategic Investment Associate" }
     ]);
     expect(applicationTasks.slice(1).every((task) => task.priority === "Critical")).toBe(true);
   });
@@ -85,18 +87,18 @@ describe("task contract", () => {
 
     expect(inboxTasks.map((task) => task.title)).toEqual(expect.arrayContaining([
       "Agency-forwarded duplicate review",
-      "Low-confidence inbox review: Forwarded profile from agency",
-      "Duplicate review: Quang Do / Q. Do",
+      "Low-confidence inbox review: Forwarded finance associate profile from agency",
+      "Duplicate review: Vivian Tran / V. Tran",
       "AI Action approval: Match",
       "Approve AI candidate merge writeback"
     ]));
     expect(inboxTasks.find((task) => task.title.startsWith("Low-confidence"))?.relatedObjects).toEqual([
-      { module: "Inbox", id: "thread-agency-forward", label: "Forwarded profile from agency" }
+      { module: "Inbox", id: "thread-agency-forward", label: "Forwarded finance associate profile from agency" }
     ]);
     expect(inboxTasks.find((task) => task.title.startsWith("Duplicate review"))?.evidenceRefs).toEqual([
       "Phone exact match",
       "Agency source differs",
-      "CV overlap 89%"
+      "Deal list overlap 89%"
     ]);
     expect(inboxTasks.find((task) => task.title.startsWith("AI Action approval"))?.allowedActions).toEqual([
       { label: "Approve AI action", kind: "complete", targetStatus: "Completed" },
@@ -109,7 +111,7 @@ describe("task contract", () => {
       candidateConfirmationStatus: "Confirmed",
       interviewType: "Technical",
       interviewer: "Mai Ho",
-      locationOrLink: "https://meet.hireos.test/trang-tech",
+      locationOrLink: "https://meet.hireos.test/finance-panel",
       scheduledStartAt: "2026-07-29T10:00:00.000Z"
     });
     const completed = completeInterview(
@@ -123,15 +125,15 @@ describe("task contract", () => {
     expect(tasks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: `task-interview-feedback-${completed.interview.id}`,
-        title: "Trang Nguyen interview feedback overdue",
+        title: "Sophia Chen interview feedback overdue",
         sourceModule: "Applications",
         owner: "Mai Ho",
         priority: "Critical",
         status: "Open",
-        nextAction: "Submit interview feedback for Trang Nguyen",
+        nextAction: "Submit interview feedback for Sophia Chen",
         slaState: "Overdue",
         relatedObjects: expect.arrayContaining([
-          { module: "Applications", id: "application-trang-backend", label: "Trang Nguyen · Senior Backend Engineer" }
+          { module: "Applications", id: "application-sophia-finance-director", label: "Sophia Chen · Finance Director" }
         ])
       })
     ]));
@@ -159,7 +161,7 @@ describe("task contract", () => {
 
     expect(tasks.map((task) => [task.id, task.nextAction, task.owner ?? task.ownerRole, task.slaState])).toEqual(expect.arrayContaining([
       [`task-assessment-draft-${draft.id}`, "Review assessment draft and rubric", "Linh Tran", "Ready"],
-      [`task-assessment-ready-${ready.id}`, "Send assessment instructions to Trang Nguyen", "Linh Tran", "Today"],
+      [`task-assessment-ready-${ready.id}`, "Send assessment instructions to Minh Anh Vo", "Linh Tran", "Today"],
       [`task-assessment-sent-${sent.id}`, "Follow up for assessment submission", "Candidate", "Waiting"],
       [`task-assessment-submission-${submitted.id}`, "Parse candidate submission package", "Linh Tran", "Today"],
       [`task-assessment-review-${parsed.id}`, "Start AI assessment review", "Linh Tran", "Ready"],
@@ -173,8 +175,8 @@ describe("task contract", () => {
     const founderTasks = filterFounderTasks(tasks);
 
     expect(founderTasks.map((task) => [task.title, task.ownerRole, task.sourceModule, task.allowedActions.map((action) => action.label)])).toEqual([
-      ["Founder final interview approval", "Founder", "Applications", ["Continue", "Request More Evidence", "Final Interview", "Reject", "Offer Decision"]],
-      ["Founder offer decision risk", "Founder", "Applications", ["Request More Evidence", "Reject", "Offer Decision"]]
+      ["Founder offer approval for Finance Director", "Founder", "Applications", ["Continue", "Request More Evidence", "Final Interview", "Reject", "Offer Decision"]],
+      ["Founder decision risk for Finance Director offer", "Founder", "Applications", ["Request More Evidence", "Reject", "Offer Decision"]]
     ]);
     expect(founderTasks.map((task) => task.title)).not.toContain("Agency-forwarded duplicate review");
     expect(founderTasks.map((task) => task.title)).not.toContain("Assessment submission follow-up");

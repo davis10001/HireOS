@@ -1343,7 +1343,7 @@ function AssessmentsPage({
         <div className="top-actions"><button className="ghost-button" type="button" onClick={() => setModalOpen(true)}><FilePenLine aria-hidden="true" /> Draft rubric</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><SendHorizontal aria-hidden="true" /> Send assessment</button></div>
       </header>
       <section className="page-content">
-        <div className="hero-row"><section className="hero-panel"><h2>Assessments should close evidence gaps, not become extra process drag.</h2><p>Each assignment is tied to Scorecard criteria, candidate context, submitted artifacts, and a human-calibrated decision.</p></section><section className="hero-panel ai"><h2>Stop Rule suggestion</h2><p>{latestReview?.aiReview?.stopRuleRecommendation ?? "For Trang Nguyen, evidence coverage is high enough to move forward without another assignment round."}</p></section></div>
+        <div className="hero-row"><section className="hero-panel"><h2>Assessments should close evidence gaps, not become extra process drag.</h2><p>Each assignment is tied to Scorecard criteria, candidate context, submitted artifacts, and a human-calibrated decision.</p></section><section className="hero-panel ai"><h2>Stop Rule suggestion</h2><p>{latestReview?.aiReview?.stopRuleRecommendation ?? "For Sophia Chen, evidence coverage is high enough to move forward without another assignment round."}</p></section></div>
         <section className="metric-grid"><Metric label="Open Assessments" value={String(assessments.filter((assessment) => assessment.status !== "Complete").length)} detail={`${reviewAssessments.length} require review`} /><Metric label="Submitted" value={String(assessments.filter((assessment) => assessment.submissions.length > 0).length)} detail="Parsed from email or attachment" /><Metric label="Avg Review Time" value="1.8d" detail="Mock review-time seam" /><Metric label="Overdue" value={String(overdue)} detail="Need HR follow-up" warning={overdue > 0} /></section>
         <section className="panel">
           <div className="panel-header"><div><h2>Assessment Workspace</h2><p>Submission status, rubric confidence, and next decision</p></div><div className="tabs">{(["Review", "Sent", "Draft"] as const).map((tab) => <button className={`tab ${activeTab === tab ? "active" : ""}`} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</div></div>
@@ -1368,7 +1368,7 @@ function AssessmentsPage({
           {visibleAssessments.length === 0 ? <div className="empty-state">No {activeTab.toLowerCase()} assessments yet.</div> : null}
         </section>
         <section className="content-grid">
-          <section className="panel"><div className="panel-header"><div><h2>Evidence Profile</h2><p>Rubric-linked signals</p></div></div><div className="cards">{assessments.flatMap((assessment) => assessment.evidenceEvents.map((event) => <div className="work-card ai" key={event.id}><div className="card-copy"><strong>{event.eventType.replaceAll("_", " ")}</strong><p>{event.summary}</p></div><div className="config-meta"><span className="pill green">{event.approvalStatus}</span><span className="pill">{event.sourceType}</span>{event.confidence ? <span className="pill">Rubric match {event.confidence}%</span> : null}</div></div>))}{assessments.every((assessment) => assessment.evidenceEvents.length === 0) ? <div className="work-card"><div className="card-copy"><strong>Debugging depth</strong><p>Candidate identified failure modes, rollback plan, and observability gaps.</p></div></div> : null}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Evidence Profile</h2><p>Rubric-linked signals</p></div></div><div className="cards">{assessments.flatMap((assessment) => assessment.evidenceEvents.map((event) => <div className="work-card ai" key={event.id}><div className="card-copy"><strong>{event.eventType.replaceAll("_", " ")}</strong><p>{event.summary}</p></div><div className="config-meta"><span className="pill green">{event.approvalStatus}</span><span className="pill">{event.sourceType}</span>{event.confidence ? <span className="pill">Rubric match {event.confidence}%</span> : null}</div></div>))}{assessments.every((assessment) => assessment.evidenceEvents.length === 0) ? <div className="work-card"><div className="card-copy"><strong>Investment judgment</strong><p>Candidate identified market risks, valuation assumptions, and memo tradeoffs.</p></div></div> : null}</div></section>
           <section className="panel"><div className="panel-header"><div><h2>Follow-up Queue</h2><p>Assessment operations</p></div></div><div className="timeline">{assessments.filter((assessment) => assessment.status !== "Complete").map((assessment) => <TimelineStep key={assessment.id} index={assessment.status} title={assessment.title} detail={`${assessment.candidateName} · ${assessment.owner} owns ${assessment.status === "Sent" ? "candidate follow-up" : "rubric calibration"}`} status={assessment.status === "Calibrate" ? "Ready" : "HR"} warn={assessment.status === "Sent"} />)}{assessments.every((assessment) => assessment.status === "Complete") ? <TimelineStep index="Now" title="No pending assessment follow-up" detail="Completed assessments are visible in Application Timeline." status="Ready" /> : null}</div></section>
         </section>
       </section>
@@ -1396,9 +1396,9 @@ function AssessmentTableRow({ assessment }: { assessment: Assessment }) {
 
 function AssessmentDraftModal({ applications, onClose, onCreate }: { applications: Application[]; onClose: () => void; onCreate: (applicationId: string, title: string, purpose: string, prompt: string) => void }) {
   const [applicationId, setApplicationId] = useState(applications[0]?.id ?? "");
-  const [title, setTitle] = useState("Backend system design");
-  const [purpose, setPurpose] = useState("Close backend scorecard evidence gaps without adding process drag.");
-  const [prompt, setPrompt] = useState("Review an event-driven API failure and propose a rollback plan.");
+  const [title, setTitle] = useState("Investment memo case");
+  const [purpose, setPurpose] = useState("Close investment scorecard evidence gaps without adding process drag.");
+  const [prompt, setPrompt] = useState("Review a fintech target and draft a concise founder-ready investment recommendation.");
 
   return (
     <div className="modal-backdrop">
@@ -1431,7 +1431,7 @@ function ApplicationDetailPage({
     candidateConfirmationStatus: "Confirmed",
     interviewer: "Mai Ho",
     interviewType: "Technical",
-    locationOrLink: "https://meet.hireos.test/trang-tech",
+    locationOrLink: "https://meet.hireos.test/finance-panel",
     scheduledStartAt: "2026-07-29T03:00:00.000Z"
   });
   const [feedbackDraft, setFeedbackDraft] = useState({
@@ -1441,11 +1441,11 @@ function ApplicationDetailPage({
     scorecardScores: "",
     strengths: ""
   });
-  const candidateName = candidate?.fullName ?? application?.candidateName ?? "Trang Nguyen";
-  const jobTitle = application?.jobTitle ?? "高级后端工程师";
-  const currentState = application?.currentState ?? "Founder Review";
+  const candidateName = candidate?.fullName ?? application?.candidateName ?? "Sophia Chen";
+  const jobTitle = application?.jobTitle ?? "Finance Director";
+  const currentState = application?.currentState ?? "Offer Decision";
   const currentOwner = application?.currentOwner ?? "Founder";
-  const nextAction = application?.nextAction ?? "批准终面";
+  const nextAction = application?.nextAction ?? "Approve offer package";
   const dueAt = application?.dueAt ? new Date(application.dueAt).toLocaleDateString("en-CA") : "今天到期";
   const activeInterview = application?.interviews?.find((interview) => interview.status !== "Cancelled" && interview.status !== "No Show") ?? application?.interviews?.[0];
 
@@ -1650,8 +1650,8 @@ function InboxPage({ onOpenDetail, onOpenEmailAgent }: { onOpenDetail: () => voi
                   <span className={pillClass(item.status)}>{statusCopy(item.status)}</span>
                 </button>
               ))}
-              <div className="table-row"><div className="cell-main"><strong>CV - Trang Nguyen Backend</strong><span>High confidence intake remains a seam until A domain is ready</span></div><span>Email Intake</span><span>Email Thread</span><span className="pill green">Ready seam</span></div>
-              <div className="table-row"><div className="cell-main"><strong>Quang Do duplicate signal</strong><span>Duplicate Review shell only, merge disabled</span></div><span>Candidate Duplicate</span><span>Candidate Seam</span><span className="pill warn">Review</span></div>
+              <div className="table-row"><div className="cell-main"><strong>CV - Sophia Chen Finance Director</strong><span>High confidence intake remains a seam until A domain is ready</span></div><span>Email Intake</span><span>Email Thread</span><span className="pill green">Ready seam</span></div>
+              <div className="table-row"><div className="cell-main"><strong>Vivian Tran duplicate signal</strong><span>Duplicate Review shell only, merge disabled</span></div><span>Candidate Duplicate</span><span>Candidate Seam</span><span className="pill warn">Review</span></div>
             </div>
           </section>
           <section className={activeTab === "sync" ? "" : "is-hidden"}>
@@ -1692,7 +1692,7 @@ function MailboxConnectModal({ onClose }: { onClose: () => void }) {
           {step === 0 ? <section className="connect-panel"><div className="option-grid"><button className="mail-provider active" type="button"><MailOpen aria-hidden="true" /><strong>Gmail</strong><span>MVP 先接入 HR 招聘邮箱</span></button><button className="mail-provider" type="button" disabled><Inbox aria-hidden="true" /><strong>Outlook</strong><span>后续版本支持</span></button></div><div className="rule-note"><strong>业务规则</strong><span>连接的是 HR 招聘邮箱，不是个人消息中心。</span></div></section> : null}
           {step === 1 ? <section className="connect-panel"><div className="permission-grid"><article><strong>邮件标题与线程</strong><span>判断是否招聘相关，并还原完整沟通上下文。</span></article><article><strong>邮件正文</strong><span>提取候选人回复和异常信息。</span></article><article><strong>附件</strong><span>识别 CV 和补充材料。</span></article><article><strong>发件人/收件人</strong><span>区分候选人、HR、面试官和猎头。</span></article></div><div className="rule-note"><strong>授权边界</strong><span>低置信度、候选人合并和 Application 创建必须等待人工和 A-owned domain。</span></div></section> : null}
           {step === 2 ? <section className="connect-panel"><div className="settings-grid"><article className="config-card"><h3>监控范围</h3><p>只读取招聘相关 Label：Inbox / CV / Assessment。</p></article><article className="config-card"><h3>自动写入</h3><p>当前只写入本地 seam state，不写 Candidate/Application。</p></article></div></section> : null}
-          {step === 3 ? <section className="connect-panel"><div className="preview-metrics"><div><span>可能的 CV 邮件</span><strong>48</strong></div><div><span>可匹配岗位</span><strong>36</strong></div><div><span>低置信度匹配</span><strong>9</strong></div><div><span>重复候选人</span><strong>2</strong></div><div><span>待审核</span><strong>1</strong></div></div><div className="table connect-preview-table"><div className="table-row header"><span>识别结果</span><span>AI 动作</span><span>写入方式</span></div><div className="table-row"><span>Forwarded profile from agency</span><span>可能重复候选人</span><span className="pill warn">人工审核</span></div></div></section> : null}
+          {step === 3 ? <section className="connect-panel"><div className="preview-metrics"><div><span>可能的 CV 邮件</span><strong>48</strong></div><div><span>可匹配岗位</span><strong>36</strong></div><div><span>低置信度匹配</span><strong>9</strong></div><div><span>重复候选人</span><strong>2</strong></div><div><span>待审核</span><strong>1</strong></div></div><div className="table connect-preview-table"><div className="table-row header"><span>识别结果</span><span>AI 动作</span><span>写入方式</span></div><div className="table-row"><span>Forwarded finance profile from agency</span><span>可能重复候选人</span><span className="pill warn">人工审核</span></div></div></section> : null}
           {step === 4 ? <section className="connect-panel"><div className="connect-done"><div className="done-icon"><Check aria-hidden="true" /></div><h3>招聘邮箱已开始同步</h3><p>高置信度事件只进入 seam preview；模糊项进入待办箱，附带原始邮件、AI 提取字段和置信度。</p><div className="config-meta"><span className="pill green">Gmail 已连接</span><span className="pill warn">9 个待审核</span></div></div></section> : null}
         </div>
         <footer className="modal-footer"><button className="ghost-button" type="button" onClick={() => setStep((current) => Math.max(0, current - 1))}>上一步</button><span className="footer-spacer" /><button className="ghost-button" type="button" onClick={onClose}>取消</button><button className="primary-button" type="button" onClick={() => step === 4 ? onClose() : setStep((current) => Math.min(4, current + 1))}>下一步</button></footer>
@@ -1733,18 +1733,18 @@ function InboxDetailPage() {
 
   return (
     <>
-      <header className="topbar"><div className="page-title"><h1>Agency-forwarded profile</h1><p>Inbox 队列详情：原始邮件、AI 推荐、置信度、人工审批和写回预览。</p></div><div className="top-actions"><button className="ghost-button" type="button"><MailOpen aria-hidden="true" /> Open Raw Email</button><button className="primary-button" type="button" onClick={() => applyReview("approved")}><Check aria-hidden="true" /> Confirm Match</button></div></header>
+      <header className="topbar"><div className="page-title"><h1>Agency-forwarded finance profile</h1><p>Inbox 队列详情：原始邮件、AI 推荐、置信度、人工审批和写回预览。</p></div><div className="top-actions"><button className="ghost-button" type="button"><MailOpen aria-hidden="true" /> Open Raw Email</button><button className="primary-button" type="button" onClick={() => applyReview("approved")}><Check aria-hidden="true" /> Confirm Match</button></div></header>
       <section className="page-content">
         <div className="secondary-tabs"><button className="secondary-tab active" type="button"><MailQuestion aria-hidden="true" /> Low-confidence Review</button><button className="secondary-tab" type="button"><Paperclip aria-hidden="true" /> Evidence</button><button className="secondary-tab" type="button"><BadgeCheck aria-hidden="true" /> AI Action Approval</button></div>
         <div className="hero-row"><section className="hero-panel"><h2>This queue item is blocked because the candidate identity is ambiguous.</h2><p>AI should not create or merge candidate records when identity confidence is medium.</p></section><section className="hero-panel ai"><h2>Approval boundary</h2><p>AI can extract, compare, and suggest. Human approval is required before merge or Application creation.</p></section></div>
-        <section className="metric-grid"><Metric label="Detected Type" value="CV Intake" detail="Agency forward" /><Metric label="Job Match" value="62%" detail="Platform Engineer" warning /><Metric label="Identity Match" value="72%" detail="Possible duplicate" warning /><Metric label="Write-back" value="Blocked" detail="Seam only" warning /></section>
+        <section className="metric-grid"><Metric label="Detected Type" value="CV Intake" detail="Agency forward" /><Metric label="Job Match" value="62%" detail="Investment Associate" warning /><Metric label="Identity Match" value="72%" detail="Possible duplicate" warning /><Metric label="Write-back" value="Blocked" detail="Seam only" warning /></section>
         <section className="detail-grid">
           <div className="detail-stack">
             <section className="panel"><div className="panel-header"><div><h2>Raw Email Evidence</h2><p>Primary source stays attached to every extracted event</p></div></div><div className="cards">{item.rawEvidence.map((evidence) => <div className="work-card" key={evidence}><div className="card-copy"><strong>{evidence}</strong><span>Source remains the original Email Thread / Attachment seam.</span></div></div>)}</div></section>
             <section className="panel"><div className="panel-header"><div><h2>AI Recommendation</h2><p>Confidence and action preview before any human decision</p></div></div><div className="settings-grid"><article className="config-card"><h3>{aiAction.actionType}</h3><p>{aiAction.outputSummary}</p><div className="config-meta"><span className="pill warn">{Math.round(aiAction.confidence * 100)}% confidence</span><span className="pill">Pending Approval</span></div></article><article className="config-card"><h3>Recommendation</h3><p>{item.recommendation}</p><div className="config-meta"><span className="pill danger">No auto-write</span></div></article></div></section>
             <section className="panel"><div className="panel-header"><div><h2>Write-back Preview</h2><p>What will change if HR confirms</p></div></div><div className="timeline">{item.writebackPreview.map((preview, index) => <TimelineStep key={preview} index={String(index + 1)} title={preview} detail="Preview only; Candidate/Application domain is not mutated in B." status={index === 0 ? "Review" : "Blocked"} warn={index !== 0} />)}</div></section>
           </div>
-          <section className="panel"><div className="panel-header"><div><h2>Human Review Checklist</h2><p>Why this cannot be fully automatic</p></div></div><div className="cards"><div className="work-card"><div className="card-copy"><strong>Confirm identity</strong><span>Same phone number but different agency email.</span></div></div><div className="work-card"><div className="card-copy"><strong>Confirm job</strong><span>Platform 62%, Backend 58%; not strong enough.</span></div></div></div><div className="review-action-grid"><button className="primary-button" type="button" onClick={() => applyReview("approved")}>Approve</button><button className="ghost-button" type="button" onClick={() => applyReview("modified")}>Modify</button><button className="ghost-button" type="button" onClick={() => setRejecting(true)}>Reject</button><button className="ghost-button" type="button" onClick={() => applyReview("snoozed")}>Snooze</button></div>{rejecting ? <div className="reject-box"><label className="form-field"><span>Reject reason</span><textarea aria-label="Reject reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /></label><button className="primary-button" type="button" disabled={!rejectReason.trim()} onClick={() => setMessage(`Rejected with reason: ${rejectReason.trim()}`)}>Confirm Reject</button></div> : null}{message ? <div className="rule-note"><strong>{message}</strong><span>No Candidate/Application core data was written by this review action.</span></div> : null}</section>
+          <section className="panel"><div className="panel-header"><div><h2>Human Review Checklist</h2><p>Why this cannot be fully automatic</p></div></div><div className="cards"><div className="work-card"><div className="card-copy"><strong>Confirm identity</strong><span>Same phone number but different agency email.</span></div></div><div className="work-card"><div className="card-copy"><strong>Confirm job</strong><span>Investment Associate 62%, Finance Controller 58%; not strong enough.</span></div></div></div><div className="review-action-grid"><button className="primary-button" type="button" onClick={() => applyReview("approved")}>Approve</button><button className="ghost-button" type="button" onClick={() => applyReview("modified")}>Modify</button><button className="ghost-button" type="button" onClick={() => setRejecting(true)}>Reject</button><button className="ghost-button" type="button" onClick={() => applyReview("snoozed")}>Snooze</button></div>{rejecting ? <div className="reject-box"><label className="form-field"><span>Reject reason</span><textarea aria-label="Reject reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /></label><button className="primary-button" type="button" disabled={!rejectReason.trim()} onClick={() => setMessage(`Rejected with reason: ${rejectReason.trim()}`)}>Confirm Reject</button></div> : null}{message ? <div className="rule-note"><strong>{message}</strong><span>No Candidate/Application core data was written by this review action.</span></div> : null}</section>
         </section>
       </section>
     </>
@@ -2204,11 +2204,11 @@ function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): Ag
   }
   if (route === "assessments") {
     return {
-      recommendation: "Move Trang Nguyen forward and skip additional assessment.",
+      recommendation: "Move Sophia Chen forward and skip additional assessment.",
       evidence: [
-        { label: "Evidence", value: "6 of 7 Backend scorecard areas covered." },
-        { label: "Risk", value: "Another assignment may reduce candidate response rate." },
-        { label: "Confidence", value: "High · rubric match 88%." }
+        { label: "Evidence", value: "Finance Director finalist evidence covers the scorecard." },
+        { label: "Risk", value: "Another assignment may reduce close rate while a competing offer is active." },
+        { label: "Confidence", value: "High · rubric match 91%." }
       ],
       ask: "Ask about assessment evidence, rubric quality, submissions, or Stop Rule confidence.",
       approveLabel: "Approve",
@@ -2217,12 +2217,12 @@ function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): Ag
   }
   if (route === "application-detail") {
     return {
-      recommendation: "可以询问候选人背景、面试状态、为什么建议进入终面，或让 AI 起草终面问题。",
+      recommendation: "可以询问候选人背景、面试状态、为什么建议进入 Offer Review，或让 AI 起草 Founder 决策摘要。",
       evidence: [
         { label: "Candidate", value: candidate?.fullName ?? "Selected application candidate" },
-        { label: "建议", value: "推进创始人终面，不再增加测评。" },
-        { label: "风险", value: "领导力缺口需要在终面覆盖。" },
-        { label: "置信度", value: "高 · 已关联 7 个证据事件。" }
+        { label: "建议", value: "推进 Founder Offer 决策，不再增加测评。" },
+        { label: "风险", value: "薪资超预算、竞争 Offer、Notice period 需要 Founder 判断。" },
+        { label: "置信度", value: "高 · 已关联关键证据事件。" }
       ],
       ask: "询问这个候选人的背景、证据缺口、终面准备或下一步动作。",
       approveLabel: "起草问题",
@@ -2231,10 +2231,10 @@ function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): Ag
   }
   if (route === "job-detail" && job) {
     return {
-      recommendation: "Review the Assessment rubric before sending another case, then keep the job Active.",
+      recommendation: "Review compensation, location, and scorecard blockers before sending more finance candidates into the workflow.",
       evidence: [
-        { label: "Evidence", value: "Scorecard is 92% covered; rubric has one incomplete dimension." },
-        { label: "Risk", value: "Weak rubric will reduce assessment evidence quality." },
+        { label: "Evidence", value: "Finance scorecards cover leadership, modeling, and founder communication." },
+        { label: "Risk", value: "Budget and location blockers can lower close rate." },
         { label: "Confidence", value: "High · based on workflow configuration." }
       ],
       ask: `Ask about ${job.title} role setup, workflow checks, or assessment rubric quality.`,

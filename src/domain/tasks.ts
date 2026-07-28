@@ -55,6 +55,7 @@ export function buildRecruitingTasks(input: { applications: Application[]; asses
     ...input.applications.flatMap(applicationTasks),
     ...input.applications.flatMap(interviewTasks),
     founderOfferRiskTask(),
+    completedScreeningTask(),
     ...input.assessments.map(assessmentTask),
     ...seedInboxItems.map(inboxTask),
     ...seedEmailThreads.filter((thread) => thread.status === "needs_review" || thread.confidence < 0.75).map(lowConfidenceInboxTask),
@@ -114,7 +115,7 @@ function applicationTask(application: Application): RecruitingTask {
 
   return {
     id: `task-application-${application.id}`,
-    title: owner === "Founder" ? "Founder final interview approval" : `${application.candidateName} application next action`,
+    title: owner === "Founder" ? `Founder offer approval for ${application.jobTitle}` : `${application.candidateName} application next action`,
     sourceModule: "Applications",
     owner: owner && owner !== "Founder" ? owner : undefined,
     ownerRole: owner === "Founder" ? "Founder" : "HR",
@@ -131,10 +132,10 @@ function applicationTask(application: Application): RecruitingTask {
       { label: "Reject", kind: "complete", targetStatus: "Completed" },
       { label: "Offer Decision", kind: "complete", targetStatus: "Completed" }
     ] : [{ label: "Complete next action", kind: "complete", targetStatus: "Completed" }],
-    aiRecommendation: "Approve the final interview path and avoid adding extra assessment work.",
+    aiRecommendation: owner === "Founder" ? "Approve, route, or decline the offer package after reviewing compensation and close-risk evidence." : "Keep the next step specific enough for HR to move the application without re-reading the full timeline.",
     aiAutomationLevel: owner === "Founder" ? "L4" : "L2",
     aiApprovalRequired: owner === "Founder",
-    risk: "Candidate has another offer timeline this week; delay may reduce close rate.",
+    risk: owner === "Founder" ? "Candidate has a competing offer and requested compensation is above the approved band; delay may reduce close rate." : "Application movement can stall if owner, due date, or evidence gaps stay outside the Task queue.",
     evidenceRefs: application.timeline.map((event) => event.title),
     batchReview: false
   };
@@ -206,7 +207,7 @@ function applicationRelatedObjects(application: Application): TaskRelatedObject[
 function founderOfferRiskTask(): RecruitingTask {
   return {
     id: "task-founder-offer-risk",
-    title: "Founder offer decision risk",
+    title: "Founder decision risk for Finance Director offer",
     sourceModule: "Applications",
     ownerRole: "Founder",
     priority: "Critical",
@@ -214,18 +215,46 @@ function founderOfferRiskTask(): RecruitingTask {
     nextAction: "Human-confirm offer decision",
     dueAt: "2026-07-28T18:00:00.000Z",
     slaState: "Today",
-    relatedObjects: [{ module: "Applications", id: "application-trang-backend", label: "Trang Nguyen · Senior Backend Engineer" }],
+    relatedObjects: [{ module: "Applications", id: "application-sophia-finance-director", label: "Sophia Chen · Finance Director" }],
     allowedActions: [
       { label: "Request More Evidence", kind: "route", targetStatus: "Routed" },
       { label: "Reject", kind: "complete", targetStatus: "Completed" },
       { label: "Offer Decision", kind: "complete", targetStatus: "Completed" }
     ],
-    aiRecommendation: "Keep the offer decision with the Founder because the evidence packet includes sensitive decision and compensation context.",
+    aiRecommendation: "Keep the Finance Director offer decision with the Founder because compensation, competing offer, and cash-leadership evidence are sensitive.",
     aiAutomationLevel: "L4",
     aiApprovalRequired: true,
-    risk: "Offer decision, rejection, and compensation-sensitive writebacks must remain human-confirmed and auditable.",
-    evidenceRefs: ["Moved to Founder Review", "Assessment evidence attached", "Offer decision approval required"],
+    risk: "Requested base is 12% above band and the candidate has a competing offer expiring this week.",
+    evidenceRefs: ["Moved to Offer Review", "Reference call complete", "Compensation exception approval required"],
     batchReview: false
+  };
+}
+
+function completedScreeningTask(): RecruitingTask {
+  return {
+    id: "task-completed-hr-screen-sophia",
+    title: "Sophia Chen HR screening completed",
+    sourceModule: "Applications",
+    owner: "Linh Tran",
+    ownerRole: "HR",
+    priority: "Normal",
+    status: "Completed",
+    nextAction: "Screening notes attached to Finance Director application",
+    dueAt: "2026-07-22T09:00:00.000Z",
+    slaState: "Ready",
+    relatedObjects: [
+      { module: "Candidates", id: "candidate-sophia-chen", label: "Sophia Chen" },
+      { module: "Jobs", id: "job-finance-director", label: "Finance Director" },
+      { module: "Applications", id: "application-sophia-finance-director", label: "Sophia Chen · Finance Director" }
+    ],
+    allowedActions: [{ label: "View completed screening", kind: "complete", targetStatus: "Completed" }],
+    aiRecommendation: "Use the completed screening notes as evidence; do not request another HR screen.",
+    risk: "Completed work should remain visible so founder review has the full decision trail.",
+    evidenceRefs: ["HR screen notes", "Salary expectations captured", "Notice period captured"],
+    batchReview: false,
+    completedAction: "Complete next action",
+    completedBy: "Linh Tran",
+    completedAt: "2026-07-22T09:10:00.000Z"
   };
 }
 
@@ -405,7 +434,7 @@ function inboxTask(item: (typeof seedInboxItems)[number]): RecruitingTask {
       { label: "Complete duplicate review", kind: "complete", targetStatus: "Completed" }
     ],
     aiRecommendation: item.recommendation,
-    risk: "Do not merge or create an Application until HR confirms the identity.",
+    risk: "Do not merge or create an Application until HR confirms identity, English memo evidence, and investment role fit.",
     evidenceRefs: item.rawEvidence,
     batchReview: true
   };
@@ -515,7 +544,7 @@ function sensitiveCandidateMergeTask(): RecruitingTask {
     slaState: "Today",
     relatedObjects: [
       { module: "Inbox", id: "ai-agency-match", label: "Candidate merge approval" },
-      { module: "Inbox", id: "inbox-agency-forward", label: "Agency-forwarded profile" }
+      { module: "Inbox", id: "inbox-agency-forward", label: "Agency-forwarded finance profile" }
     ],
     allowedActions: [
       { label: "Approve AI writeback", kind: "complete", targetStatus: "Completed" },
@@ -562,7 +591,7 @@ function assessmentEmailTask(thread: (typeof seedEmailThreads)[number]): Recruit
     ownerRole: "Candidate",
     priority: "High",
     status: "Waiting on Others",
-    nextAction: "Wait for candidate submission package and attach parsed evidence",
+    nextAction: "Wait for candidate submission package and attach parsed investment evidence",
     dueAt: "2026-07-29T10:00:00.000Z",
     slaState: "Waiting",
     relatedObjects: [
@@ -584,7 +613,7 @@ function jobTask(job: Job): RecruitingTask {
     sourceModule: "Jobs",
     owner: job.owner,
     ownerRole: "HR",
-    priority: job.priority === "urgent" ? "Critical" : "High",
+    priority: job.priority === "urgent" || job.blockedCount > 0 ? "Critical" : "High",
     status: job.status === "draft" ? "Open" : "Waiting on Others",
     nextAction: job.status === "draft" ? "Confirm owner, SLA, and scorecard defaults" : "Clear workflow blocker",
     dueAt: job.updatedAt,

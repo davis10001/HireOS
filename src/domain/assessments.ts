@@ -101,22 +101,63 @@ export interface Assessment {
 
 export const seedAssessments: Assessment[] = [
   createAssessment({
-    applicationId: "application-trang-backend",
-    candidateName: "Trang Nguyen",
-    jobId: "job-backend",
-    jobTitle: "Senior Backend Engineer",
-    title: "Trang Nguyen · Backend system design",
-    purpose: "Close backend scorecard gaps without another process-heavy assignment.",
-    prompt: "Review an event-driven API failure, identify rollback options, and explain tradeoffs.",
+    applicationId: "application-minh-investment-associate",
+    candidateName: "Minh Anh Vo",
+    jobId: "job-investment-associate",
+    jobTitle: "Strategic Investment Associate",
+    title: "Minh Anh Vo · Investment memo case",
+    purpose: "Close evidence gaps on market judgment, valuation quality, and English investment memo writing.",
+    prompt: "Review a Vietnam fintech target, build a concise valuation view, and draft a founder-ready investment recommendation.",
     rubric: [
-      { name: "Debugging depth", description: "Failure modes, rollback, and observability", weight: 40, passThreshold: "Strong evidence" },
-      { name: "API reliability", description: "Contract design, idempotency, and queues", weight: 35, passThreshold: "Meets bar" },
-      { name: "Communication clarity", description: "Clear written tradeoffs and follow-up plan", weight: 25, passThreshold: "Readable by HR and engineering" }
+      { name: "Investment judgment", description: "Market size, competitive position, and downside risks", weight: 40, passThreshold: "Strong evidence" },
+      { name: "Modeling discipline", description: "Assumptions, sensitivity checks, and valuation range", weight: 35, passThreshold: "Meets bar" },
+      { name: "Memo clarity", description: "Concise English memo suitable for founder review", weight: 25, passThreshold: "Readable by HR and founder" }
     ],
     owner: "Linh Tran",
-    dueAt: "2026-07-29T10:00:00.000Z",
+    dueAt: "2026-07-28T16:00:00.000Z",
     createdBy: "Linh Tran"
-  })
+  }),
+  {
+    ...createAssessment({
+      applicationId: "application-sophia-finance-director",
+      candidateName: "Sophia Chen",
+      jobId: "job-finance-director",
+      jobTitle: "Finance Director",
+      title: "Sophia Chen · Finance operating plan",
+      purpose: "Stop additional assessment because interviews and board memo evidence already cover the scorecard.",
+      prompt: "Summarize a 90-day finance operating plan for cash reporting, close cadence, and board materials.",
+      rubric: [
+        { name: "Cash planning", description: "Weekly cash visibility and controls", weight: 35, passThreshold: "Strong evidence" },
+        { name: "Close cadence", description: "Month-end accountability and reporting hygiene", weight: 30, passThreshold: "Meets bar" },
+        { name: "Board communication", description: "Clear executive narrative and risks", weight: 35, passThreshold: "Strong evidence" }
+      ],
+      owner: "Linh Tran",
+      dueAt: "2026-07-28T11:00:00.000Z",
+      createdBy: "Linh Tran"
+	    }),
+	    id: "assessment-sophia-stop-rule",
+	    status: "Skipped by Stop Rule",
+    aiReview: {
+      rubricMatch: 91,
+      evidence: "Founder interview, board memo sample, and reference call already cover the scorecard.",
+      risk: "Additional assessment may weaken close rate while the candidate has a competing offer.",
+      confidence: "High",
+      stopRuleRecommendation: "Skip additional assessment"
+    },
+    evidenceEvents: [
+      {
+        id: "evidence-sophia-stop-rule",
+        applicationId: "application-sophia-finance-director",
+        assessmentId: "assessment-sophia-stop-rule",
+        eventType: "assessment_stop_rule",
+        sourceType: "User",
+        summary: "Stop rule accepted after full finalist evidence packet.",
+        confidence: 91,
+        approvalStatus: "Approved",
+        createdAt: "2026-07-28T06:00:00.000Z"
+      }
+    ]
+  }
 ];
 
 export function buildAssessmentDraft(application: Application, job: Job, owner: string): AssessmentDraft {
