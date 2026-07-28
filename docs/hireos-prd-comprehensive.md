@@ -1,9 +1,9 @@
 # HireOS 全面产品需求文档 PRD
 
-版本：v0.1  
+版本：v0.2
 日期：2026-07-28  
 范围：MVP 到可落地 Alpha  
-依据：当前 `frontend-prototype/` 交互原型、`sources/` 参考文档、已整理领域词汇表
+依据：当前 `frontend-prototype/` 交互原型、`sources/` 参考文档、已整理领域词汇表、`docs/p0-task-center-spec.md`、`docs/prd-v0.2-task-operating-system-addendum.md`
 
 ## 1. 产品概述
 
@@ -42,6 +42,17 @@ MVP 成立的最低闭环：
 11. Founder 能在 Founder Inbox 处理 Continue、Request More Evidence、Final Interview、Reject、Offer Decision。
 12. Blocked 页面能显示逾期、无人负责、证据缺口、等待候选人或等待面试官导致的阻塞，并生成可处理 Task。
 13. Analytics 能展示招聘漏斗、渠道质量、执行效率、Task aging 和 AI 采纳。
+
+### 1.4 v0.2 需求覆盖声明
+
+`docs/prd-v0.2-task-operating-system-addendum.md` 将补充的 “Vietnam AI Hiring OS 产品任务定义与说明” 拆成 T01-T33 的完整需求矩阵，并标注每项需求在当前产品中的落点、分期和开发影响。
+
+本 PRD 正文继续作为 MVP / Alpha 的主产品定义；v0.2 增补文档作为任务操作系统的需求索引。两者的关系如下：
+
+- P0：必须进入当前 Task Center 及其并行任务，包括 Task 核心对象、Tasks 独立栏目、Daily Home 摘要、Founder Inbox 任务视图、Application / Inbox / Interview / Assessment / Blocked / Settings 的任务来源规则。
+- P1：进入下一轮产品增强，包括完整 Job Package、AI / HR 分歧任务、HR 初面结构化字段、Communication Task、AI 质量异常、每日工作标准和更完整 SLA 模板。
+- P2 / Alpha：进入可落地 Alpha，包括更完整的 Offer / Onboarding、30 / 60 / 90 天反馈闭环、候选人沟通自动化扩展和招聘模型校准。
+- MVP 外：实时 Interview Agent、视频转录、Zalo / DM 自动化、完整 Candidate Portal、完整合同签署与入职系统。
 
 ## 2. 用户、角色与权限
 

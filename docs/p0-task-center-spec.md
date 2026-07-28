@@ -102,8 +102,10 @@ Inbox 保留，但它收窄为邮件摄取、低置信度解析、重复候选�
 This P0 changes product information architecture, not just a page. It should be implemented only after the current MVP integration branch has stabilized. The recommended implementation split is:
 
 - J - Task Core / Task Center
-- K - Dashboard Daily Summary
-- L - Module Task Emitters
-- M - Founder Inbox / SLA Governance Views
+- K - Dashboard Daily Task Summary
+- L - Application / Inbox Task Emitters
+- M - Interview / Assessment Task Emitters
+- N - Founder Inbox / Governance Task Views
+- O - P0 Task Center Integration
 
-J should define the Task contract first. K, L and M can then work against that contract in parallel.
+J should define the Task contract first. K, L, M and N can then work against that contract in parallel. O should wait for J-N to complete.
