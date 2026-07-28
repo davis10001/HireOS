@@ -141,4 +141,91 @@ describe("Login + Jobs prototype slice", () => {
     await user.click(screen.getByRole("button", { name: /sign out/i }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
   });
+
+  it("preserves the Inbox prototype tabs and mailbox connection modal", async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    await user.click(screen.getByRole("button", { name: "Inbox" }));
+
+    expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /工作队列/i })).toHaveClass("active");
+    expect(screen.getByRole("button", { name: /同步状态/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /关联邮箱/i })).toBeInTheDocument();
+    expect(screen.getByText("Agency-forwarded profile")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /connect mailbox/i }));
+    const dialog = screen.getByRole("dialog", { name: /连接招聘邮箱/i });
+    expect(within(dialog).getByRole("button", { name: /1 邮箱类型/i })).toHaveClass("active");
+    expect(within(dialog).getByRole("button", { name: /2 授权说明/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /3 读取规则/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /4 扫描预览/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /5 开始同步/i })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /下一步/i }));
+    expect(within(dialog).getByRole("button", { name: /2 授权说明/i })).toHaveClass("active");
+  });
+
+  it("renders the Email Agent intake queue as the prototype front door", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/email-agent");
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Email Agent" })).toBeInTheDocument();
+    expect(screen.getByText("Intake Queue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Needs Review" })).toHaveClass("active");
+    expect(screen.getByText("Email Thread")).toBeInTheDocument();
+    expect(screen.getByText("Detected Type")).toBeInTheDocument();
+    expect(screen.getByText("Job Match")).toBeInTheDocument();
+    expect(screen.getByText("AI Action")).toBeInTheDocument();
+    expect(screen.getByText("Forwarded profile from agency")).toBeInTheDocument();
+    expect(screen.getByText("Low conf.")).toBeInTheDocument();
+  });
+
+  it("supports low-confidence Inbox Detail review actions without Candidate/Application writes", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/inbox-detail");
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Agency-forwarded profile" })).toBeInTheDocument();
+    expect(screen.getByText("Raw Email Evidence")).toBeInTheDocument();
+    expect(screen.getByText("AI Recommendation")).toBeInTheDocument();
+    expect(screen.getByText("Write-back Preview")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    expect(screen.getByText("Approved in B seam only. Candidate/Application write remains blocked.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    expect(screen.getByLabelText("Reject reason")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Reject reason"), "Wrong job match");
+    await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
+    expect(screen.getByText("Rejected with reason: Wrong job match")).toBeInTheDocument();
+  });
+
+  it("keeps duplicate review as a Candidate-page shell instead of merging", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/candidates");
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Candidates" })).toBeInTheDocument();
+    expect(screen.getByText("Candidate Registry")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate Review")).toBeInTheDocument();
+    expect(screen.getByText("Quang Do / Q. Do")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /queue duplicate review for quang do/i }));
+    expect(screen.getByText("Queued for HR review. Merge waits for A-owned Candidate domain.")).toBeInTheDocument();
+  });
 });
+
+async function login(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+  await user.type(screen.getByLabelText(/password/i), "secret1");
+  await user.click(screen.getByRole("button", { name: /sign in/i }));
+}

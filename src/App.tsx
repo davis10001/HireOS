@@ -18,12 +18,17 @@ import {
   Layers3,
   LayoutDashboard,
   LogOut,
+  MailOpen,
+  MailPlus,
+  MailQuestion,
   MessagesSquare,
   OctagonAlert,
   PanelLeftClose,
   PanelRightClose,
+  Paperclip,
   PauseCircle,
   Plus,
+  RefreshCw,
   Save,
   SendHorizontal,
   Settings,
@@ -52,6 +57,16 @@ import {
   seedJobs,
   validateJobStep
 } from "./domain/jobs";
+import {
+  DuplicateSignalSeam,
+  InboxItemStatus,
+  countNeedsReviewThreads,
+  reviewInboxItem,
+  seedAiActions,
+  seedDuplicateSignals,
+  seedEmailThreads,
+  seedInboxItems
+} from "./domain/inbox";
 import "./styles.css";
 
 type RouteId =
@@ -148,8 +163,8 @@ export default function App() {
     <AppShell
       activeRoute={shellActiveRoute(route)}
       agentContext={agentContext}
-      agentTitle={route === "application-detail" ? "申请 AI 工作区" : route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
-      agentSubtitle={route === "application-detail" ? "候选人、流程状态和下一步" : route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
+      agentTitle={agentTitle(route)}
+      agentSubtitle={agentSubtitle(route)}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -174,7 +189,11 @@ export default function App() {
         <JobDetailPage job={selectedJob} onBack={() => navigate("jobs")} onOpenApplication={() => navigate("application-detail")} />
       ) : null}
       {route === "application-detail" ? <ApplicationDetailPage /> : null}
-      {isPlaceholderRoute(route) && route !== "application-detail" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {route === "inbox" ? <InboxPage onOpenDetail={() => navigate("inbox-detail")} onOpenEmailAgent={() => navigate("email-agent")} /> : null}
+      {route === "email-agent" ? <EmailAgentPage /> : null}
+      {route === "inbox-detail" ? <InboxDetailPage /> : null}
+      {route === "candidates" ? <CandidatesPage /> : null}
+      {isPlaceholderRoute(route) && !["application-detail", "inbox", "email-agent", "inbox-detail", "candidates"].includes(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -695,6 +714,170 @@ function ApplicationStep({ ai, done, evidence, focus, icon, next, owner, sla, st
   );
 }
 
+function InboxPage({ onOpenDetail, onOpenEmailAgent }: { onOpenDetail: () => void; onOpenEmailAgent: () => void }) {
+  const [activeTab, setActiveTab] = useState<"queue" | "sync" | "mailboxes">("queue");
+  const [modalOpen, setModalOpen] = useState(false);
+  const needsReviewCount = countNeedsReviewThreads(seedEmailThreads);
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Inbox</h1><p>邮件录入、低置信度匹配、候选人去重和 AI 动作审批的统一工作台。</p></div>
+        <div className="top-actions"><button className="ghost-button" type="button"><RefreshCw aria-hidden="true" /> Sync</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><MailPlus aria-hidden="true" /> Connect Mailbox</button></div>
+      </header>
+      <section className="page-content">
+        <div className="hero-row single">
+          <section className="hero-panel ai"><h2>AI 审批规则</h2><p>AI 可以起草、分类、提取和建议。低置信度匹配、候选人合并和 Application 创建在本模块只进入 review seam。</p></section>
+        </div>
+        <section className="metric-grid">
+          <Metric label="Email Intake" value="48" detail="Threads need structure" />
+          <Metric label="Needs Review" value={String(needsReviewCount)} detail="Low-confidence seam items" warning />
+          <Metric label="Duplicate Signals" value={String(seedDuplicateSignals.length)} detail="Merge disabled in B slice" />
+          <Metric label="AI Actions" value={String(seedAiActions.length)} detail="Pending approval shell" warning />
+        </section>
+        <section className="unframed-section">
+          <div className="panel-header"><div><h2>统一工作队列</h2><p>二级业务队列统一归入一个运营待办箱</p></div><div className="top-actions"><button className="ghost-button" type="button" onClick={onOpenEmailAgent}>Open Email Agent</button></div></div>
+          <div className="secondary-tabs">
+            <button className={`secondary-tab ${activeTab === "queue" ? "active" : ""}`} type="button" onClick={() => setActiveTab("queue")}><Inbox aria-hidden="true" /> 工作队列</button>
+            <button className={`secondary-tab ${activeTab === "sync" ? "active" : ""}`} type="button" onClick={() => setActiveTab("sync")}><RefreshCw aria-hidden="true" /> 同步状态</button>
+            <button className={`secondary-tab ${activeTab === "mailboxes" ? "active" : ""}`} type="button" onClick={() => setActiveTab("mailboxes")}><MailPlus aria-hidden="true" /> 关联邮箱</button>
+          </div>
+          <section className={activeTab === "queue" ? "" : "is-hidden"}>
+            <div className="table inbox-table">
+              <div className="table-row header"><span>队列项</span><span>类型</span><span>对象</span><span>状态</span></div>
+              {seedInboxItems.map((item) => (
+                <button className="table-row table-row-button" key={item.id} type="button" onClick={onOpenDetail}>
+                  <div className="cell-main"><strong>{item.title}</strong><span>{item.recommendation}</span></div>
+                  <span>{item.type}</span>
+                  <span>{item.object}</span>
+                  <span className={pillClass(item.status)}>{statusCopy(item.status)}</span>
+                </button>
+              ))}
+              <div className="table-row"><div className="cell-main"><strong>CV - Trang Nguyen Backend</strong><span>High confidence intake remains a seam until A domain is ready</span></div><span>Email Intake</span><span>Email Thread</span><span className="pill green">Ready seam</span></div>
+              <div className="table-row"><div className="cell-main"><strong>Quang Do duplicate signal</strong><span>Duplicate Review shell only, merge disabled</span></div><span>Candidate Duplicate</span><span>Candidate Seam</span><span className="pill warn">Review</span></div>
+            </div>
+          </section>
+          <section className={activeTab === "sync" ? "" : "is-hidden"}>
+            <div className="table sync-table">
+              <div className="table-row header"><span>同步时间</span><span>邮件</span><span>类型</span><span>基本信息</span><span>处理结果</span></div>
+              {seedEmailThreads.map((thread, index) => (
+                <div className="table-row" key={thread.id}><span>{index === 0 ? "10:42" : index === 1 ? "09:24" : "09:10"}</span><div className="cell-main"><strong>{thread.subject}</strong><span>{thread.sender}</span></div><span>{thread.detectedType}</span><span>{thread.jobMatch} · {Math.round(thread.confidence * 100)}%</span><span className={thread.status === "needs_review" ? "pill danger" : thread.status === "auto_applied" ? "pill green" : "pill warn"}>{thread.status === "needs_review" ? "低置信度" : thread.status === "auto_applied" ? "Seam ready" : "Draft"}</span></div>
+              ))}
+            </div>
+          </section>
+          <section className={activeTab === "mailboxes" ? "" : "is-hidden"}>
+            <div className="mailbox-panel-head"><div><h3>已关联邮箱</h3><p>管理哪些邮箱参与招聘邮件同步、AI 识别和写回规则。</p></div></div>
+            <div className="table mailbox-table">
+              <div className="table-row header"><span>邮箱</span><span>同步范围</span><span>写入规则</span><span>状态</span><span>操作</span></div>
+              <div className="table-row"><div className="cell-main"><strong>recruiting@company.vn</strong><span>主 HR 招聘邮箱</span></div><span>Inbox / CV / Assessment</span><span>仅写入 B seam</span><span className="pill green">已连接</span><div className="row-actions"><button type="button">编辑</button><button type="button">删除</button></div></div>
+              <div className="table-row"><div className="cell-main"><strong>agency-intake@company.vn</strong><span>猎头转发与补充材料</span></div><span>Agency / Forwarded</span><span>全部进入人工审核</span><span className="pill warn">需确认</span><div className="row-actions"><button type="button">编辑</button><button type="button">删除</button></div></div>
+            </div>
+          </section>
+        </section>
+      </section>
+      {modalOpen ? <MailboxConnectModal onClose={() => setModalOpen(false)} /> : null}
+    </>
+  );
+}
+
+function MailboxConnectModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const labels = ["邮箱类型", "授权说明", "读取规则", "扫描预览", "开始同步"];
+
+  return (
+    <div className="modal-backdrop">
+      <section className="mail-connect-modal" role="dialog" aria-modal="true" aria-labelledby="mail-connect-title">
+        <header className="modal-header"><div><h2 id="mail-connect-title">连接招聘邮箱</h2><p>先授权，再配置读取范围，最后预览 AI 识别结果。当前只连接 Inbox seam，不创建 Candidate/Application。</p></div><button className="icon-button" type="button" aria-label="关闭邮箱连接流程" onClick={onClose}><X aria-hidden="true" /></button></header>
+        <div className="connect-steps" aria-label="邮箱连接步骤">
+          {labels.map((label, index) => <button className={`connect-step ${step === index ? "active" : ""}`} key={label} type="button" onClick={() => setStep(index)}><span>{index + 1}</span>{label}</button>)}
+        </div>
+        <div className="connect-panels">
+          {step === 0 ? <section className="connect-panel"><div className="option-grid"><button className="mail-provider active" type="button"><MailOpen aria-hidden="true" /><strong>Gmail</strong><span>MVP 先接入 HR 招聘邮箱</span></button><button className="mail-provider" type="button" disabled><Inbox aria-hidden="true" /><strong>Outlook</strong><span>后续版本支持</span></button></div><div className="rule-note"><strong>业务规则</strong><span>连接的是 HR 招聘邮箱，不是个人消息中心。</span></div></section> : null}
+          {step === 1 ? <section className="connect-panel"><div className="permission-grid"><article><strong>邮件标题与线程</strong><span>判断是否招聘相关，并还原完整沟通上下文。</span></article><article><strong>邮件正文</strong><span>提取候选人回复和异常信息。</span></article><article><strong>附件</strong><span>识别 CV 和补充材料。</span></article><article><strong>发件人/收件人</strong><span>区分候选人、HR、面试官和猎头。</span></article></div><div className="rule-note"><strong>授权边界</strong><span>低置信度、候选人合并和 Application 创建必须等待人工和 A-owned domain。</span></div></section> : null}
+          {step === 2 ? <section className="connect-panel"><div className="settings-grid"><article className="config-card"><h3>监控范围</h3><p>只读取招聘相关 Label：Inbox / CV / Assessment。</p></article><article className="config-card"><h3>自动写入</h3><p>当前只写入本地 seam state，不写 Candidate/Application。</p></article></div></section> : null}
+          {step === 3 ? <section className="connect-panel"><div className="preview-metrics"><div><span>可能的 CV 邮件</span><strong>48</strong></div><div><span>可匹配岗位</span><strong>36</strong></div><div><span>低置信度匹配</span><strong>9</strong></div><div><span>重复候选人</span><strong>2</strong></div><div><span>待审核</span><strong>1</strong></div></div><div className="table connect-preview-table"><div className="table-row header"><span>识别结果</span><span>AI 动作</span><span>写入方式</span></div><div className="table-row"><span>Forwarded profile from agency</span><span>可能重复候选人</span><span className="pill warn">人工审核</span></div></div></section> : null}
+          {step === 4 ? <section className="connect-panel"><div className="connect-done"><div className="done-icon"><Check aria-hidden="true" /></div><h3>招聘邮箱已开始同步</h3><p>高置信度事件只进入 seam preview；模糊项进入待办箱，附带原始邮件、AI 提取字段和置信度。</p><div className="config-meta"><span className="pill green">Gmail 已连接</span><span className="pill warn">9 个待审核</span></div></div></section> : null}
+        </div>
+        <footer className="modal-footer"><button className="ghost-button" type="button" onClick={() => setStep((current) => Math.max(0, current - 1))}>上一步</button><span className="footer-spacer" /><button className="ghost-button" type="button" onClick={onClose}>取消</button><button className="primary-button" type="button" onClick={() => step === 4 ? onClose() : setStep((current) => Math.min(4, current + 1))}>下一步</button></footer>
+      </section>
+    </div>
+  );
+}
+
+function EmailAgentPage() {
+  const [tab, setTab] = useState<"Needs Review" | "Auto Applied" | "Drafts">("Needs Review");
+  const visibleThreads = seedEmailThreads.filter((thread) => tab === "Needs Review" ? thread.status === "needs_review" : tab === "Auto Applied" ? thread.status === "auto_applied" : thread.status === "draft");
+
+  return (
+    <>
+      <header className="topbar"><div className="page-title"><h1>Email Agent</h1><p>读取线程和附件，识别候选人、岗位和 AI 动作；当前只承载前置 seam。</p></div><div className="top-actions"><button className="ghost-button" type="button"><RefreshCw aria-hidden="true" /> Sync</button><button className="primary-button" type="button"><MailPlus aria-hidden="true" /> Connect Mailbox</button></div></header>
+      <section className="page-content">
+        <div className="hero-row single"><section className="hero-panel"><h2>48 email threads need structured decisions before they touch the pipeline.</h2><p>The page separates high-confidence seam previews from low-confidence HR review, preserving raw email evidence.</p></section></div>
+        <section className="metric-grid"><Metric label="Threads Parsed" value="128" detail="Today across 2 mailboxes" /><Metric label="CV Attachments" value="42" detail="Duplicate candidates found" /><Metric label="Auto Matched" value="87%" detail="Seam preview only" /><Metric label="Needs Review" value="14" detail="Ambiguous role or duplicate" warning /></section>
+        <section className="panel"><div className="panel-header"><div><h2>Intake Queue</h2><p>Email threads before candidate/application updates</p></div><div className="tabs">{(["Needs Review", "Auto Applied", "Drafts"] as const).map((label) => <button className={`tab ${tab === label ? "active" : ""}`} key={label} type="button" onClick={() => setTab(label)}>{label}</button>)}</div></div><div className="toolbar"><div className="search"><MailQuestion aria-hidden="true" /> Search sender, job, attachment</div><span className="chip green"><Sparkles aria-hidden="true" /> Evidence extraction on</span></div><div className="table email-table"><div className="table-row header"><span>Email Thread</span><span>Detected Type</span><span>Job Match</span><span>AI Action</span><span>Status</span></div>{visibleThreads.map((thread) => <div className="table-row" key={thread.id}><div className="cell-main"><strong>{thread.subject}</strong><span>{thread.sender}</span></div><span>{thread.detectedType}</span><span>{thread.jobMatch}</span><span>{thread.aiAction}</span><span className={thread.status === "needs_review" ? "pill danger" : thread.status === "auto_applied" ? "pill green" : "pill warn"}>{thread.status === "needs_review" ? "Low conf." : thread.status === "auto_applied" ? "Ready" : "Draft"}</span></div>)}</div></section>
+      </section>
+    </>
+  );
+}
+
+function InboxDetailPage() {
+  const item = seedInboxItems[0];
+  const aiAction = seedAiActions[0];
+  const [message, setMessage] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  function applyReview(status: InboxItemStatus, note?: string) {
+    const result = reviewInboxItem(item, status, note);
+    if (status === "approved" && result.candidateApplicationWriteBlocked) setMessage("Approved in B seam only. Candidate/Application write remains blocked.");
+    if (status === "modified" && result.candidateApplicationWriteBlocked) setMessage("Modified in B seam only. Candidate/Application write remains blocked.");
+    if (status === "snoozed") setMessage("Snoozed for HR follow-up. Candidate/Application write remains blocked.");
+  }
+
+  return (
+    <>
+      <header className="topbar"><div className="page-title"><h1>Agency-forwarded profile</h1><p>Inbox 队列详情：原始邮件、AI 推荐、置信度、人工审批和写回预览。</p></div><div className="top-actions"><button className="ghost-button" type="button"><MailOpen aria-hidden="true" /> Open Raw Email</button><button className="primary-button" type="button" onClick={() => applyReview("approved")}><Check aria-hidden="true" /> Confirm Match</button></div></header>
+      <section className="page-content">
+        <div className="secondary-tabs"><button className="secondary-tab active" type="button"><MailQuestion aria-hidden="true" /> Low-confidence Review</button><button className="secondary-tab" type="button"><Paperclip aria-hidden="true" /> Evidence</button><button className="secondary-tab" type="button"><BadgeCheck aria-hidden="true" /> AI Action Approval</button></div>
+        <div className="hero-row"><section className="hero-panel"><h2>This queue item is blocked because the candidate identity is ambiguous.</h2><p>AI should not create or merge candidate records when identity confidence is medium.</p></section><section className="hero-panel ai"><h2>Approval boundary</h2><p>AI can extract, compare, and suggest. Human approval is required before merge or Application creation.</p></section></div>
+        <section className="metric-grid"><Metric label="Detected Type" value="CV Intake" detail="Agency forward" /><Metric label="Job Match" value="62%" detail="Platform Engineer" warning /><Metric label="Identity Match" value="72%" detail="Possible duplicate" warning /><Metric label="Write-back" value="Blocked" detail="Seam only" warning /></section>
+        <section className="detail-grid">
+          <div className="detail-stack">
+            <section className="panel"><div className="panel-header"><div><h2>Raw Email Evidence</h2><p>Primary source stays attached to every extracted event</p></div></div><div className="cards">{item.rawEvidence.map((evidence) => <div className="work-card" key={evidence}><div className="card-copy"><strong>{evidence}</strong><span>Source remains the original Email Thread / Attachment seam.</span></div></div>)}</div></section>
+            <section className="panel"><div className="panel-header"><div><h2>AI Recommendation</h2><p>Confidence and action preview before any human decision</p></div></div><div className="settings-grid"><article className="config-card"><h3>{aiAction.actionType}</h3><p>{aiAction.outputSummary}</p><div className="config-meta"><span className="pill warn">{Math.round(aiAction.confidence * 100)}% confidence</span><span className="pill">Pending Approval</span></div></article><article className="config-card"><h3>Recommendation</h3><p>{item.recommendation}</p><div className="config-meta"><span className="pill danger">No auto-write</span></div></article></div></section>
+            <section className="panel"><div className="panel-header"><div><h2>Write-back Preview</h2><p>What will change if HR confirms</p></div></div><div className="timeline">{item.writebackPreview.map((preview, index) => <TimelineStep key={preview} index={String(index + 1)} title={preview} detail="Preview only; Candidate/Application domain is not mutated in B." status={index === 0 ? "Review" : "Blocked"} warn={index !== 0} />)}</div></section>
+          </div>
+          <section className="panel"><div className="panel-header"><div><h2>Human Review Checklist</h2><p>Why this cannot be fully automatic</p></div></div><div className="cards"><div className="work-card"><div className="card-copy"><strong>Confirm identity</strong><span>Same phone number but different agency email.</span></div></div><div className="work-card"><div className="card-copy"><strong>Confirm job</strong><span>Platform 62%, Backend 58%; not strong enough.</span></div></div></div><div className="review-action-grid"><button className="primary-button" type="button" onClick={() => applyReview("approved")}>Approve</button><button className="ghost-button" type="button" onClick={() => applyReview("modified")}>Modify</button><button className="ghost-button" type="button" onClick={() => setRejecting(true)}>Reject</button><button className="ghost-button" type="button" onClick={() => applyReview("snoozed")}>Snooze</button></div>{rejecting ? <div className="reject-box"><label className="form-field"><span>Reject reason</span><textarea aria-label="Reject reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /></label><button className="primary-button" type="button" disabled={!rejectReason.trim()} onClick={() => setMessage(`Rejected with reason: ${rejectReason.trim()}`)}>Confirm Reject</button></div> : null}{message ? <div className="rule-note"><strong>{message}</strong><span>No Candidate/Application core data was written by this review action.</span></div> : null}</section>
+        </section>
+      </section>
+    </>
+  );
+}
+
+function CandidatesPage() {
+  const [message, setMessage] = useState("");
+
+  return (
+    <>
+      <header className="topbar"><div className="page-title"><h1>Candidates</h1><p>可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。</p></div><div className="top-actions"><button className="ghost-button" type="button"><Paperclip aria-hidden="true" /> Import CV</button><button className="primary-button" type="button"><Plus aria-hidden="true" /> New Candidate</button></div></header>
+      <section className="page-content">
+        <div className="hero-row"><section className="hero-panel"><h2>Candidate is the person record. Applications keep the job-specific process separate.</h2><p>B only exposes dedup review seams; real Candidate merge waits for A-owned domain.</p></section><section className="hero-panel ai"><h2>Deduplication insight</h2><p>{seedDuplicateSignals.length} profiles may be duplicates based on phone, email aliases, CV hash, and agency-forwarded attachments.</p></section></div>
+        <section className="metric-grid"><Metric label="Candidates" value="231" detail="284 CVs mapped to people" /><Metric label="Duplicates" value={String(seedDuplicateSignals.length)} detail="Need HR merge review" warning /><Metric label="Multi-role" value="18" detail="Applied to 2+ jobs" /><Metric label="CV Versions" value="47" detail="Updated attachments retained" /></section>
+        <section className="panel"><div className="panel-header"><div><h2>Candidate Registry</h2><p>Identity, source, CV history, and cross-job context</p></div><div className="tabs"><button className="tab active" type="button">All</button><button className="tab" type="button">Duplicates</button><button className="tab" type="button">High value</button></div></div><div className="toolbar"><div className="search"><MailQuestion aria-hidden="true" /> Search name, email, source</div><span className="chip green"><Sparkles aria-hidden="true" /> Dedup watch</span></div><div className="table candidates-table"><div className="table-row header"><span>Candidate</span><span>Source</span><span>Applications</span><span>Latest Evidence</span><span>Status</span></div><CandidateRow initials="TN" name="Trang Nguyen" email="trang.nguyen@mail.vn" source="Email" applications="Backend" evidence="Assessment v2" status="High fit" /><CandidateRow initials="QD" name="Quang Do" email="agency forwarded" source="Agency" applications="Backend + Platform seam" evidence="Duplicate signal" status="Review" warn /></div></section>
+        <section className="content-grid"><div className="panel"><div className="panel-header"><div><h2>Duplicate Review</h2><p>Merge candidates only with evidence</p></div></div><div className="cards">{seedDuplicateSignals.map((signal) => <DuplicateSignalCard key={signal.id} signal={signal} onQueue={() => setMessage("Queued for HR review. Merge waits for A-owned Candidate domain.")} />)}</div>{message ? <div className="rule-note"><strong>{message}</strong><span>Duplicate review shell preserves the prototype container without mutating Candidate records.</span></div> : null}</div><div className="panel"><div className="panel-header"><div><h2>Candidate History</h2><p>Cross-job evidence continuity</p></div></div><div className="timeline"><TimelineStep index="2026" title="Backend application seam" detail="Assessment and interview evidence retained as read-only preview" status="Active" /><TimelineStep index="2025" title="Platform referral" detail="Past evidence remains visible before merge review" status="Past" /></div></div></section>
+      </section>
+    </>
+  );
+}
+
+function CandidateRow({ applications, email, evidence, initials, name, source, status, warn = false }: { applications: string; email: string; evidence: string; initials: string; name: string; source: string; status: string; warn?: boolean }) {
+  return <div className="table-row"><div className="person-row"><div className="avatar">{initials}</div><div className="cell-main"><strong>{name}</strong><span>{email}</span></div></div><span>{source}</span><span>{applications}</span><span>{evidence}</span><span className={`pill ${warn ? "danger" : "green"}`}>{status}</span></div>;
+}
+
+function DuplicateSignalCard({ onQueue, signal }: { onQueue: () => void; signal: DuplicateSignalSeam }) {
+  return <div className="work-card ai"><div className="card-top"><div className="card-copy"><strong>{signal.candidateLabel}</strong><p>{signal.matchReason}</p></div><span className="pill warn">{Math.round(signal.confidence * 100)}%</span></div><div className="config-meta">{signal.evidence.map((item) => <span className="pill" key={item}>{item}</span>)}</div><button className="ghost-button" type="button" onClick={onQueue}>Queue duplicate review for {signal.candidateLabel}</button></div>;
+}
+
 function PlaceholderPage({ route, title }: { route: PlaceholderRoute; title: string }) {
   const modules = placeholderModules(route);
   const metrics = placeholderMetrics(route);
@@ -761,6 +944,24 @@ function statusLabel(status: JobStatus): string {
   return ({ active: "Active", draft: "Draft", paused: "Paused", closed: "Closed" })[status];
 }
 
+function pillClass(status: InboxItemStatus): string {
+  if (status === "approved" || status === "modified") return "pill green";
+  if (status === "rejected") return "pill danger";
+  return "pill warn";
+}
+
+function statusCopy(status: InboxItemStatus): string {
+  const copy: Record<InboxItemStatus, string> = {
+    approved: "Approved",
+    in_review: "In Review",
+    modified: "Modified",
+    open: "Open",
+    rejected: "Rejected",
+    snoozed: "Snoozed"
+  };
+  return copy[status];
+}
+
 function loadJobs(): Job[] {
   try {
     const raw = window.localStorage.getItem(JOBS_KEY);
@@ -802,6 +1003,27 @@ function shellActiveRoute(route: RouteId): ShellNavRoute {
   if (route === "analytics") return "analytics";
   if (route === "jobs" || route === "dashboard" || route === "inbox" || route === "settings") return route;
   return "dashboard";
+}
+
+function agentTitle(route: RouteId): string {
+  if (route === "application-detail") return "申请 AI 工作区";
+  if (route === "job-detail") return "Job AI Workspace";
+  if (route === "jobs") return "岗位 Agent";
+  if (route === "inbox" || route === "inbox-detail") return "Inbox AI Workspace";
+  if (route === "email-agent") return "Email Agent";
+  if (route === "candidates") return "Candidate Agent";
+  return "HireOS Agent";
+}
+
+function agentSubtitle(route: RouteId): string {
+  if (route === "application-detail") return "候选人、流程状态和下一步";
+  if (route === "job-detail") return "Role setup and workflow checks";
+  if (route === "jobs") return "流程与 Scorecard 设置";
+  if (route === "inbox") return "Queues, approvals, and write-back seams";
+  if (route === "inbox-detail") return "Extraction and approval";
+  if (route === "email-agent") return "Mailbox intake and confidence review";
+  if (route === "candidates") return "Identity and history";
+  return "Workflow and evidence";
 }
 
 function isPlaceholderRoute(route: RouteId): route is PlaceholderRoute {
@@ -862,6 +1084,58 @@ function buildAgentContext(route: RouteId, job?: Job): AgentContext {
         { label: "置信度", value: "高 · 基于岗位配置。" }
       ],
       ask: "对比岗位招聘流程，或起草一段 Scorecard。"
+    };
+  }
+  if (route === "inbox") {
+    return {
+      recommendation: "Do not auto-apply the agency-forwarded profile. Route the identity and job ambiguity through Inbox Detail.",
+      evidence: [
+        { label: "Evidence", value: "Raw email, CV attachment, and duplicate phone signal are preserved." },
+        { label: "Risk", value: "Candidate merge and Application creation are blocked in this B seam." },
+        { label: "Confidence", value: "Medium · identity match 72%." }
+      ],
+      ask: "Ask about queue risk, mailbox sync status, or why an item needs human review.",
+      approveLabel: "Create task",
+      reviewLabel: "Inspect"
+    };
+  }
+  if (route === "inbox-detail") {
+    return {
+      recommendation: "Approve, modify, reject, or snooze this item only inside the Inbox seam. Candidate/Application writes remain disabled.",
+      evidence: [
+        { label: "Evidence", value: "Identity 72%, job match 62%, source is agency forward." },
+        { label: "Risk", value: "Wrong merge could pollute two candidate histories." },
+        { label: "Boundary", value: "No final domain write in B." }
+      ],
+      ask: "Ask why this match is low confidence or draft a review note.",
+      approveLabel: "Queue review",
+      reviewLabel: "Ask HR"
+    };
+  }
+  if (route === "email-agent") {
+    return {
+      recommendation: "Keep high-confidence parsing visible as intake preview, and send ambiguous identity/job matches to Inbox.",
+      evidence: [
+        { label: "Queue", value: "Needs Review / Auto Applied / Drafts are preserved." },
+        { label: "Status", value: "AI Action and confidence are visible before writeback." },
+        { label: "Boundary", value: "Auto Applied means seam-ready, not Candidate/Application write." }
+      ],
+      ask: "Show low-confidence matches, draft a reply, or explain why a thread was classified.",
+      approveLabel: "Queue",
+      reviewLabel: "Inspect"
+    };
+  }
+  if (route === "candidates") {
+    return {
+      recommendation: "Hold duplicate merges for HR review. Evidence is suggestive, not definitive, and A owns the final Candidate domain.",
+      evidence: [
+        { label: "Evidence", value: "Phone number matches, but source email differs." },
+        { label: "Risk", value: "Wrong merge could pollute two application timelines." },
+        { label: "Confidence", value: "Medium · 72% identity match." }
+      ],
+      ask: "Ask about candidate history, duplicate evidence, or merge risk.",
+      approveLabel: "Queue review",
+      reviewLabel: "Compare"
     };
   }
   return {
