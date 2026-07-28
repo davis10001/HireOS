@@ -2250,3 +2250,83 @@ body.dock-expanded .agent-dock-prompts {
   border-color: var(--danger);
   background: var(--danger-soft);
 }
+
+@media (max-width: 760px) {
+  .detail-grid,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid,
+  .detail-stack,
+  .panel,
+  .cards,
+  .work-card,
+  .table,
+  .table-row,
+  .page-content > *,
+  .cell-main,
+  .card-copy {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .table {
+    overflow-x: auto;
+  }
+
+  .table-row,
+  .jobs-table .table-row,
+  .email-table .table-row,
+  .apps-table .table-row,
+  .candidates-table .table-row,
+  .assessment-table .table-row,
+  .blocked-table .table-row,
+  .analytics-table .table-row,
+  .detail-grid .analytics-table .table-row,
+  .detail-grid .inbox-table .table-row,
+  .inbox-table .table-row,
+  .sync-table .table-row,
+  .mailbox-table .table-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .table-row.header {
+    display: none;
+  }
+
+  .table-row > span:not(.pill),
+  .cell-main strong,
+  .cell-main span,
+  .card-copy strong,
+  .card-copy span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .row-action {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .secondary-tabs,
+  .filter-options {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .secondary-tab,
+  .filter-chip {
+    flex: 0 0 auto;
+  }
+
+  .card-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
