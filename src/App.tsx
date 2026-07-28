@@ -58,7 +58,6 @@ import {
 } from "./domain/candidates";
 import {
   Application,
-  ApplicationTimelineEvent,
   createApplicationForCandidate,
   seedApplications
 } from "./domain/applications";
@@ -104,6 +103,12 @@ import {
   seedEmailThreads,
   seedInboxItems
 } from "./domain/inbox";
+import {
+  GovernanceState,
+  defaultGovernanceState,
+  evaluateAiAction,
+  updateGovernanceState
+} from "./domain/governance";
 import "./styles.css";
 
 type RouteId =
@@ -130,6 +135,8 @@ const JOBS_KEY = "hireos.jobs";
 const CANDIDATES_KEY = "hireos.candidates";
 const APPLICATIONS_KEY = "hireos.applications";
 const ASSESSMENTS_KEY = "hireos.assessments";
+const GOVERNANCE_KEY = "hireos.governance";
+const LANGUAGE_KEY = "hireos.language";
 
 const placeholderLabels: Record<PlaceholderRoute, string> = {
   "application-detail": "Application Detail",
@@ -155,6 +162,42 @@ type AgentContext = {
 };
 type PlaceholderRow = { item: string; state: string; owner: string; action: string; sla: string; note: string; warn?: boolean };
 type PlaceholderModule = { title: string; detail: string; rows: PlaceholderRow[] };
+type Language = "EN" | "中文";
+
+const appCopy = {
+  EN: {
+    accountMenu: "User menu for",
+    analytics: "Analytics",
+    applications: "Applications",
+    assessments: "Assessments",
+    candidates: "Candidates",
+    dashboard: "Dashboard",
+    inbox: "Inbox",
+    intelligence: "Intelligence",
+    jobs: "Jobs",
+    language: "Language",
+    newCandidate: "New Candidate",
+    operate: "Operate",
+    settings: "Settings",
+    signOut: "Sign out"
+  },
+  中文: {
+    accountMenu: "用户菜单",
+    analytics: "分析",
+    applications: "申请流程",
+    assessments: "测评",
+    candidates: "候选人",
+    dashboard: "看板",
+    inbox: "待办箱",
+    intelligence: "智能",
+    jobs: "岗位",
+    language: "语言",
+    newCandidate: "新建候选人",
+    operate: "运营",
+    settings: "设置",
+    signOut: "退出登录"
+  }
+} satisfies Record<Language, Record<string, string>>;
 
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadAuthState());
@@ -164,6 +207,8 @@ export default function App() {
   const [candidates, setCandidates] = useState<Candidate[]>(loadCandidates);
   const [applications, setApplications] = useState<Application[]>(loadApplications);
   const [assessments, setAssessments] = useState<Assessment[]>(loadAssessments);
+  const [governance, setGovernance] = useState<GovernanceState>(loadGovernance);
+  const [language, setLanguage] = useState<Language>(loadLanguage);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
 
   useEffect(() => {
@@ -181,6 +226,14 @@ export default function App() {
   useEffect(() => {
     saveAssessments(assessments);
   }, [assessments]);
+
+  useEffect(() => {
+    saveGovernance(governance);
+  }, [governance]);
+
+  useEffect(() => {
+    saveLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -282,6 +335,10 @@ export default function App() {
     setApplications((current) => syncAssessmentIntoApplications(current, nextAssessment));
   }
 
+  function tightenGovernanceThreshold() {
+    setGovernance((current) => updateGovernanceState(current, { thresholds: { ...current.thresholds, candidateMatch: 0.9, autoApply: 0.94 } }, "Tighten AI writeback boundaries"));
+  }
+
   if (!session) {
     return (
       <LoginPage
@@ -307,6 +364,8 @@ export default function App() {
       agentContext={agentContext}
       agentTitle={agentTitle(route)}
       agentSubtitle={agentSubtitle(route)}
+      language={language}
+      onLanguageChange={setLanguage}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -340,7 +399,7 @@ export default function App() {
           onResolveDuplicate={resolveDuplicateCandidate}
         />
       ) : null}
-      {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
+      {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} copy={appCopy[language]} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
       {route === "applications" ? <ApplicationsPage applications={applications} assessments={assessments} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
       {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} assessments={assessments.filter((assessment) => assessment.applicationId === selectedApplication?.id)} candidate={selectedApplicationCandidate} onCompleteInterview={markInterviewCompleted} onScheduleInterview={scheduleInterview} onSubmitFeedback={submitInterviewFeedback} /> : null}
       {route === "assessments" ? (
@@ -361,7 +420,9 @@ export default function App() {
       {route === "inbox" ? <InboxPage onOpenDetail={() => navigate("inbox-detail")} onOpenEmailAgent={() => navigate("email-agent")} /> : null}
       {route === "email-agent" ? <EmailAgentPage /> : null}
       {route === "inbox-detail" ? <InboxDetailPage /> : null}
-      {isPlaceholderRoute(route) && !["application-detail", "applications", "assessments", "candidates", "inbox", "email-agent", "inbox-detail"].includes(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {route === "settings" ? <SettingsPage governance={governance} onOpenMailbox={() => navigate("settings-mailbox")} onTightenThreshold={tightenGovernanceThreshold} /> : null}
+      {route === "settings-mailbox" ? <SettingsMailboxPage governance={governance} onBack={() => navigate("settings")} /> : null}
+      {isPlaceholderRoute(route) && !["application-detail", "applications", "assessments", "candidates", "inbox", "email-agent", "inbox-detail", "settings", "settings-mailbox"].includes(route) ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -432,6 +493,8 @@ function AppShell({
   agentTitle,
   agentSubtitle,
   children,
+  language,
+  onLanguageChange,
   onNavigate,
   onSignOut,
   session
@@ -441,6 +504,8 @@ function AppShell({
   agentTitle: string;
   agentSubtitle: string;
   children: ReactNode;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
   onNavigate: (route: ShellNavRoute) => void;
   onSignOut: () => void;
   session: AuthSession;
@@ -449,6 +514,7 @@ function AppShell({
   const [agentCollapsed, setAgentCollapsed] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
+  const copy = appCopy[language];
 
   useEffect(() => {
     document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
@@ -470,33 +536,33 @@ function AppShell({
           </button>
         </div>
 
-        <div className="nav-section">Operate</div>
+        <div className="nav-section">{copy.operate}</div>
         <nav className="nav">
-          <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label="Dashboard" onClick={() => onNavigate("dashboard")} />
-          <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label="Jobs" onClick={() => onNavigate("jobs")} />
-          <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label="Candidates" onClick={() => onNavigate("candidates")} />
-          <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label="Applications" onClick={() => onNavigate("applications")} />
-          <NavButton active={activeRoute === "assessments"} icon={<FilePenLine />} label="Assessments" onClick={() => onNavigate("assessments")} />
-          <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label="Inbox" onClick={() => onNavigate("inbox")} />
+          <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label={copy.dashboard} onClick={() => onNavigate("dashboard")} />
+          <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label={copy.jobs} onClick={() => onNavigate("jobs")} />
+          <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label={copy.candidates} onClick={() => onNavigate("candidates")} />
+          <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label={copy.applications} onClick={() => onNavigate("applications")} />
+          <NavButton active={activeRoute === "assessments"} icon={<FilePenLine />} label={copy.assessments} onClick={() => onNavigate("assessments")} />
+          <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label={copy.inbox} onClick={() => onNavigate("inbox")} />
         </nav>
-        <div className="nav-section">Intelligence</div>
+        <div className="nav-section">{copy.intelligence}</div>
         <nav className="nav">
-          <NavButton active={activeRoute === "analytics"} icon={<ChartNoAxesCombined />} label="Analytics" onClick={() => onNavigate("analytics")} />
-          <NavButton active={activeRoute === "settings"} icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
+          <NavButton active={activeRoute === "analytics"} icon={<ChartNoAxesCombined />} label={copy.analytics} onClick={() => onNavigate("analytics")} />
+          <NavButton active={activeRoute === "settings"} icon={<Settings />} label={copy.settings} onClick={() => onNavigate("settings")} />
         </nav>
         <div className="sidebar-footer">
-          <div className="user-status" aria-expanded={accountOpen} role="button" tabIndex={0}>
+          <button className="user-status" aria-expanded={accountOpen} aria-label={`Account menu ${copy.accountMenu} ${session.name}`} type="button" onClick={() => setAccountOpen((value) => !value)}>
             <div className="avatar">LT</div>
             <div className="user-copy"><strong>{session.name}</strong><span><b /> Online · {session.role}</span></div>
-            <button className="account-toggle" aria-label="Account menu" title="Account menu" type="button" onClick={() => setAccountOpen((value) => !value)}>
+            <span className="account-toggle" title={copy.accountMenu}>
               <ChevronUp aria-hidden="true" />
-            </button>
-          </div>
+            </span>
+          </button>
           <div className={`account-menu ${accountOpen ? "is-open" : ""}`}>
             <button type="button"><UserRound aria-hidden="true" /> Profile</button>
             <button type="button"><Bell aria-hidden="true" /> Notifications</button>
-            <div className="language-switch" aria-label="语言切换"><span>Language</span><div><button className="active" type="button">EN</button><button type="button">中文</button></div></div>
-            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> Sign out</button>
+            <div className="language-switch" aria-label="语言切换"><span>{copy.language}</span><div>{(["EN", "中文"] as const).map((item) => <button aria-pressed={language === item} className={language === item ? "active" : ""} key={item} onClick={() => onLanguageChange(item)} type="button">{item}</button>)}</div></div>
+            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> {copy.signOut}</button>
           </div>
         </div>
       </aside>
@@ -756,7 +822,7 @@ function JobCreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   );
 }
 
-function CandidatesPage({ applications, candidates, jobs, onCreateCandidate, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; jobs: Job[]; onCreateCandidate: (candidate: Candidate) => void; onResolveDuplicate: (candidateId: string) => void }) {
+function CandidatesPage({ applications, candidates, copy, jobs, onCreateCandidate, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; copy: typeof appCopy[Language]; jobs: Job[]; onCreateCandidate: (candidate: Candidate) => void; onResolveDuplicate: (candidateId: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [duplicateSignalMessage, setDuplicateSignalMessage] = useState("");
   const assigned = candidates.filter((candidate) => candidate.allocationState === "assigned");
@@ -766,7 +832,7 @@ function CandidatesPage({ applications, candidates, jobs, onCreateCandidate, onR
 
   return (
     <>
-      <header className="topbar"><div className="page-title"><h1>Candidates</h1><p>可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。</p></div><div className="top-actions"><button className="ghost-button" type="button">Import CV</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> New Candidate</button></div></header>
+      <header className="topbar"><div className="page-title"><h1>{copy.candidates}</h1><p>可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。</p></div><div className="top-actions"><button className="ghost-button" type="button">Import CV</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> {copy.newCandidate}</button></div></header>
       <section className="page-content">
         <div className="hero-row"><section className="hero-panel"><h2>Candidate is the person record. Applications keep the job-specific process separate.</h2><p>This prevents one candidate's multiple role histories from collapsing into a single vague status.</p></section><section className="hero-panel ai"><h2>Deduplication insight</h2><p>{duplicates.length} profiles need HR review before they can be assigned to a Job.</p></section></div>
         <section className="metric-grid"><Metric label="Candidates" value={String(candidates.length)} detail={`${applications.length} job-bound applications`} /><Metric label="Assigned" value={String(assigned.length)} detail="Have at least one Application" /><Metric label="Unassigned" value={String(unassigned.length)} detail="People pool, no pipeline entry" /><Metric label="Duplicates" value={String(duplicates.length)} detail="Blocked from assignment" warning={duplicates.length > 0} /></section>
@@ -1398,6 +1464,69 @@ function InboxDetailPage() {
   );
 }
 
+function SettingsPage({ governance, onOpenMailbox, onTightenThreshold }: { governance: GovernanceState; onOpenMailbox: () => void; onTightenThreshold: () => void }) {
+  const safeDecision = evaluateAiAction(governance, { actionType: "extract_evidence", confidence: 0.93 });
+  const lowConfidenceDecision = evaluateAiAction(governance, { actionType: "candidate_match", confidence: 0.74 });
+  const forbiddenDecision = evaluateAiAction(governance, { actionType: "auto_hire", confidence: 0.99 });
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Settings</h1><p>邮箱连接、用户权限、SLA、AI 自动化规则和招聘模板。</p></div>
+        <div className="top-actions"><button className="ghost-button" type="button">Audit Log</button><button className="primary-button" type="button" onClick={onTightenThreshold}><Save aria-hidden="true" /> Save Changes</button></div>
+      </header>
+      <section className="page-content">
+        <div className="hero-row">
+          <section className="hero-panel"><h2>Settings define what AI can read, suggest, and write back into the hiring workflow.</h2><p>This page keeps operational rules out of daily queue pages, while making mailbox scope, approval gates, and status defaults explicit.</p></section>
+          <section className="hero-panel ai"><h2>Governance rule</h2><p>AI may structure evidence and update workflow status, but cannot auto-reject, auto-hire, or make an offer decision.</p></section>
+        </div>
+        <section className="metric-grid">
+          <Metric label="Mailboxes" value={String(governance.mailboxes.length)} detail="Recruiting + agency intake" />
+          <Metric label="Users" value={String(governance.roles.length)} detail="HR, founder, interviewers" />
+          <Metric label="SLA Rules" value={String(Object.keys(governance.slaDefaults).length)} detail="By application state" />
+          <Metric label="AI Rules" value={String(governance.aiAutomationRules.length)} detail={`${governance.aiAutomationRules.filter((rule) => rule.mode === "approval_required").length} require review`} warning />
+        </section>
+        <section className="panel">
+          <div className="panel-header"><div><h2>Workspace Configuration</h2><p>Company-level settings that shape every Job and Application</p></div></div>
+          <div className="settings-grid">
+            <button className="config-card link-card" type="button" onClick={onOpenMailbox}><h3>Mailbox Connections</h3><p>Control which HR inboxes AI can read, which folders count as recruiting data, and which sender domains require review.</p><div className="config-meta"><span className="pill green">Connected</span><span className="pill">{governance.mailboxes.length} inboxes</span><span className="pill warn">Low-conf review</span></div></button>
+            <article className="config-card governance-card"><h3>Roles & Permissions</h3><p>Define who can create jobs, change job status, approve evidence, view abnormal processes, and make offer decisions.</p><div className="config-meta">{governance.roles.map((role) => <span className="pill" key={role.id}>{role.label}</span>)}</div></article>
+            <article className="config-card governance-card"><h3>Status & SLA Defaults</h3><p>Owner defaults, due dates, and blocked detection rules inherited by each new job.</p><div className="config-meta"><span className="pill">HR review {governance.slaDefaults.hrReviewHours}h</span><span className="pill warn">Founder {governance.slaDefaults.founderDecisionHours}h</span><span className="pill">Feedback {governance.slaDefaults.interviewFeedbackHours}h</span></div></article>
+            <article className="config-card governance-card"><h3>AI Automation Rules</h3><p>Choose which AI actions are automatic, which require approval, and which sensitive actions are out of scope for MVP.</p><div className="config-meta"><span className="pill green">{safeDecision.status}</span><span className="pill warn">{lowConfidenceDecision.status}</span><span className="pill danger">{forbiddenDecision.status}</span></div><div className="evidence-list"><div className="evidence-item"><span>Candidate match</span><strong>{Math.round(governance.thresholds.candidateMatch * 100)}%</strong></div><div className="evidence-item"><span>Auto apply</span><strong>{Math.round(governance.thresholds.autoApply * 100)}%</strong></div></div></article>
+            <article className="config-card"><h3>Hiring Templates</h3><p>Reusable interview stages, scorecards, assessment plans, and evaluation rubrics for common role families.</p><div className="config-meta"><span className="pill">Engineer</span><span className="pill">GTM</span><span className="pill">Design</span><span className="pill">Ops</span></div></article>
+            <article className="config-card governance-card"><h3>Evidence Policy</h3><p>Required evidence event types for decisions.</p><div className="config-meta">{governance.evidencePolicy.requiredDecisionEvidence.map((item) => <span className="pill" key={item}>{item}</span>)}</div></article>
+          </div>
+        </section>
+        <section className="content-grid">
+          <section className="panel"><div className="panel-header"><div><h2>Audit Trail</h2><p>Settings changes append local audit events without mutating business records.</p></div></div><div className="timeline">{governance.auditEvents.map((event) => <TimelineStep key={event.id} index={event.actorType} title={event.action} detail={event.reason} status="Audit" />)}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Human Approval Required</h2><p>Sensitive AI actions route back through Inbox review.</p></div></div><div className="cards">{governance.auditPolicy.humanApprovalRequired.map((item) => <div className="work-card" key={item}><div className="card-copy"><strong>{item.replaceAll("_", " ")}</strong><span>Approval gate remains active in the MVP shell.</span></div></div>)}</div></section>
+        </section>
+      </section>
+    </>
+  );
+}
+
+function SettingsMailboxPage({ governance, onBack }: { governance: GovernanceState; onBack: () => void }) {
+  return (
+    <>
+      <header className="topbar"><div className="title-with-back"><button className="icon-button" aria-label="Back to Settings" type="button" onClick={onBack}><ArrowLeft aria-hidden="true" /></button><div className="page-title"><h1>Mailbox Connections</h1><p>邮箱连接详情：读取范围、文件夹规则、AI 识别边界、写回权限和审计。</p></div></div><div className="top-actions"><button className="ghost-button" type="button"><RefreshCw aria-hidden="true" /> Test Sync</button><button className="primary-button" type="button"><MailPlus aria-hidden="true" /> Add Mailbox</button></div></header>
+      <section className="page-content">
+        <div className="panel-header"><div><span className="eyebrow">Mailbox Connection</span><h2>Settings Mailbox</h2><p>Connection rules stay under governance while connection details remain visible to HR admins.</p></div><span className="pill">Mailbox setting</span></div>
+        <div className="secondary-tabs"><button className="secondary-tab active" type="button"><Inbox aria-hidden="true" /> Mailbox Connections</button><button className="secondary-tab" type="button"><UsersRound aria-hidden="true" /> Roles & Permissions</button><button className="secondary-tab" type="button"><CalendarClock aria-hidden="true" /> Status & SLA</button><button className="secondary-tab" type="button"><Sparkles aria-hidden="true" /> AI Rules</button><button className="secondary-tab" type="button" onClick={onBack}><Settings aria-hidden="true" /> All Settings</button></div>
+        <div className="hero-row"><section className="hero-panel"><h2>Email is the primary system input, so mailbox settings are production rules.</h2><p>This page decides what AI can read, what counts as recruiting evidence, when AI can write status updates, and when HR approval is required.</p></section><section className="hero-panel ai"><h2>Privacy and control</h2><p>Only configured folders and recruiting senders are processed. Sensitive replies and offer decisions require human approval.</p></section></div>
+        <section className="metric-grid"><Metric label="Connected Mailboxes" value={String(governance.mailboxes.length)} detail="Recruiting + agency" /><Metric label="Folders Watched" value={String(governance.mailboxes.reduce((sum, mailbox) => sum + mailbox.foldersWatched.length, 0))} detail="Inbox, CV, Assessment" /><Metric label="Auto Write-back" value="3" detail="Safe event types" /><Metric label="Review Rules" value={String(governance.mailboxes.filter((mailbox) => mailbox.reviewPolicy === "always").length + governance.auditPolicy.humanApprovalRequired.length)} detail="Low confidence or sensitive" warning /></section>
+        <section className="detail-grid">
+          <div className="detail-stack">
+            <section className="panel"><div className="panel-header"><div><h2>Connected Sources</h2><p>Which inboxes AI can read</p></div></div><div className="table analytics-table"><div className="table-row header"><span>Mailbox</span><span>Status</span><span>Scope</span><span>Write-back</span><span>Review</span></div>{governance.mailboxes.map((mailbox) => <div className="table-row" key={mailbox.id}><div className="cell-main"><strong>{mailbox.address}</strong><span>{mailbox.foldersWatched.join(", ")}</span></div><span className="pill green">{mailbox.status}</span><span>{mailbox.foldersWatched.length} folders</span><span>{mailbox.writebackMode}</span><span>{mailbox.reviewPolicy}</span></div>)}</div></section>
+            <section className="panel"><div className="panel-header"><div><h2>Email Processing Rules</h2><p>What AI can do with mailbox data</p></div></div><div className="settings-grid"><article className="config-card"><h3>Auto-allowed</h3><p>Parse CV attachments, extract candidate identity, attach raw email, create evidence events for high-confidence updates.</p><div className="config-meta"><span className="pill green">CV parse</span><span className="pill green">Evidence event</span></div></article><article className="config-card"><h3>Requires approval</h3><p>Candidate merge, low-confidence job match, status updates from ambiguous threads, outbound candidate replies.</p><div className="config-meta"><span className="pill warn">Merge</span><span className="pill warn">Reply</span></div></article></div></section>
+          </div>
+          <section className="panel"><div className="panel-header"><div><h2>Write-back Boundaries</h2><p>Rules aligned with MVP scope</p></div></div><div className="cards"><div className="work-card"><div className="card-copy"><strong>Allowed automatically</strong><span>High-confidence CV intake, interview schedule confirmation, assessment submission attachment.</span></div></div><div className="work-card"><div className="card-copy"><strong>Allowed after approval</strong><span>Candidate merge, job match correction, human-facing reply draft, blocked escalation task.</span></div></div><div className="work-card"><div className="card-copy"><strong>Never automatic in MVP</strong><span>Reject candidate, make offer decision, change compensation, or send sensitive offer communication.</span></div></div></div></section>
+        </section>
+      </section>
+    </>
+  );
+}
+
 function DuplicateSignalCard({ onQueue, signal }: { onQueue: () => void; signal: DuplicateSignalSeam }) {
   return <div className="work-card ai"><div className="card-top"><div className="card-copy"><strong>{signal.candidateLabel}</strong><p>{signal.matchReason}</p></div><span className="pill warn">{Math.round(signal.confidence * 100)}%</span></div><div className="config-meta">{signal.evidence.map((item) => <span className="pill" key={item}>{item}</span>)}</div><button className="ghost-button" type="button" onClick={onQueue}>Queue duplicate review for {signal.candidateLabel}</button></div>;
 }
@@ -1552,6 +1681,22 @@ function saveAssessments(assessments: Assessment[]) {
   saveLocalState(ASSESSMENTS_KEY, assessments);
 }
 
+function loadGovernance(): GovernanceState {
+  return loadLocalState(GOVERNANCE_KEY, defaultGovernanceState);
+}
+
+function saveGovernance(governance: GovernanceState) {
+  saveLocalState(GOVERNANCE_KEY, governance);
+}
+
+function loadLanguage(): Language {
+  return loadLocalState(LANGUAGE_KEY, "EN" as Language);
+}
+
+function saveLanguage(language: Language) {
+  saveLocalState(LANGUAGE_KEY, language);
+}
+
 function syncAssessmentIntoApplications(applications: Application[], assessment: Assessment): Application[] {
   return applications.map((application) => {
     if (application.id !== assessment.applicationId) return application;
@@ -1636,6 +1781,7 @@ function agentTitle(route: RouteId): string {
   if (route === "inbox" || route === "inbox-detail") return "Inbox AI Workspace";
   if (route === "email-agent") return "Email Agent";
   if (route === "candidates") return "Candidate Agent";
+  if (route === "settings" || route === "settings-mailbox") return route === "settings-mailbox" ? "Mailbox AI Workspace" : "Settings AI Workspace";
   return "HireOS Agent";
 }
 
@@ -1648,6 +1794,8 @@ function agentSubtitle(route: RouteId): string {
   if (route === "inbox-detail") return "Extraction and approval";
   if (route === "email-agent") return "Mailbox intake and confidence review";
   if (route === "candidates") return "Identity and history";
+  if (route === "settings") return "Governance and templates";
+  if (route === "settings-mailbox") return "Input rules and automation boundaries";
   return "Workflow and evidence";
 }
 

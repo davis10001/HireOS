@@ -28,6 +28,33 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByLabelText("Agent 快捷输入")).toBeInTheDocument();
   });
 
+  it("opens account menu, switches visible language copy, persists it, and signs out", async () => {
+    window.history.pushState({}, "", "/candidates");
+    const user = userEvent.setup();
+    const { unmount } = renderApp();
+
+    await login(user);
+    expect(screen.getByRole("heading", { name: "Candidates" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /account menu user menu for linh tran/i }));
+    const languageSwitch = screen.getByLabelText("语言切换");
+    expect(within(languageSwitch).getByRole("button", { name: "EN" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(languageSwitch).getByRole("button", { name: "中文" }));
+    expect(within(languageSwitch).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "候选人" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "岗位" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "申请流程" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建候选人" })).toBeInTheDocument();
+
+    unmount();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: /account menu 用户菜单 linh tran/i }));
+    expect(within(screen.getByLabelText("语言切换")).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "退出登录" }));
+    expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
+  });
+
   it("shows login validation errors and persists successful auth", async () => {
     const user = userEvent.setup();
     const { unmount } = renderApp();
@@ -284,6 +311,28 @@ describe("Login + Jobs prototype slice", () => {
     await user.type(screen.getByLabelText("Reject reason"), "Wrong job match");
     await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
     expect(screen.getByText("Rejected with reason: Wrong job match")).toBeInTheDocument();
+  });
+
+  it("renders Settings governance and mailbox rule surfaces without replacing the React app", async () => {
+    window.history.pushState({}, "", "/settings");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Workspace Configuration")).toBeInTheDocument();
+    expect(screen.getByText("AI Automation Rules")).toBeInTheDocument();
+    expect(screen.getByText("Auto Applied")).toBeInTheDocument();
+    expect(screen.getByText("Rejected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+    expect(screen.getByText("Tighten AI writeback boundaries")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /mailbox connections/i }));
+    expect(screen.getByRole("heading", { name: "Mailbox Connections" })).toBeInTheDocument();
+    expect(screen.getByText("Connected Sources")).toBeInTheDocument();
+    expect(screen.getByText("Write-back Boundaries")).toBeInTheDocument();
+    expect(screen.getByText("agency-intake@company.vn")).toBeInTheDocument();
   });
 
   it("keeps duplicate review as a Candidate-page shell instead of merging", async () => {
