@@ -24,7 +24,19 @@ export type ApplicationState =
 
 export interface ApplicationTimelineEvent {
   id: string;
-  eventType: "application_created" | "state_changed" | "owner_changed" | "not_fit_current_job";
+  eventType:
+    | "application_created"
+    | "state_changed"
+    | "owner_changed"
+    | "not_fit_current_job"
+    | "assessment_draft_created"
+    | "assessment_ready"
+    | "assessment_sent"
+    | "assessment_submission"
+    | "assessment_parsed"
+    | "assessment_review"
+    | "assessment_stop_rule"
+    | "assessment_completed";
   title: string;
   detail: string;
   actor: string;

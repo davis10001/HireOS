@@ -53,9 +53,25 @@ import {
 } from "./domain/candidates";
 import {
   Application,
+  ApplicationTimelineEvent,
   createApplicationForCandidate,
   seedApplications
 } from "./domain/applications";
+import {
+  Assessment,
+  acceptStopRule,
+  assessmentApplicationState,
+  buildAssessmentDraft,
+  completeAssessment,
+  createAssessment,
+  markAssessmentReady,
+  parseAssessmentSubmission,
+  recordAssessmentSubmission,
+  requireCalibration,
+  seedAssessments,
+  sendAssessment,
+  startAssessmentReview
+} from "./domain/assessments";
 import {
   Job,
   JobDraft,
@@ -86,12 +102,13 @@ type RouteId =
   | "settings"
   | "settings-mailbox";
 
-type ShellNavRoute = "dashboard" | "jobs" | "candidates" | "applications" | "inbox" | "analytics" | "settings";
+type ShellNavRoute = "dashboard" | "jobs" | "candidates" | "applications" | "assessments" | "inbox" | "analytics" | "settings";
 type PlaceholderRoute = Exclude<RouteId, "dashboard" | "jobs" | "job-detail">;
 
 const JOBS_KEY = "hireos.jobs";
 const CANDIDATES_KEY = "hireos.candidates";
 const APPLICATIONS_KEY = "hireos.applications";
+const ASSESSMENTS_KEY = "hireos.assessments";
 
 const placeholderLabels: Record<PlaceholderRoute, string> = {
   "application-detail": "Application Detail",
@@ -125,6 +142,7 @@ export default function App() {
   const [jobs, setJobs] = useState<Job[]>(loadJobs);
   const [candidates, setCandidates] = useState<Candidate[]>(loadCandidates);
   const [applications, setApplications] = useState<Application[]>(loadApplications);
+  const [assessments, setAssessments] = useState<Assessment[]>(loadAssessments);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
 
   useEffect(() => {
@@ -138,6 +156,10 @@ export default function App() {
   useEffect(() => {
     saveApplications(applications);
   }, [applications]);
+
+  useEffect(() => {
+    saveAssessments(assessments);
+  }, [assessments]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -187,6 +209,24 @@ export default function App() {
     setCandidates((current) => current.map((item) => item.id === candidateId ? { ...item, allocationState: "unassigned_pool", currentJobId: null, poolReason: "Duplicate reviewed by HR", updatedAt: new Date().toISOString() } : item));
   }
 
+  function createAssessmentDraft(applicationId: string, title: string, purpose: string, prompt: string) {
+    const application = applications.find((item) => item.id === applicationId);
+    const job = application ? jobs.find((item) => item.id === application.jobId) : undefined;
+    if (!application || !job) return;
+    const draft = buildAssessmentDraft(application, job, session?.name ?? "Linh Tran");
+    const assessment = createAssessment({ ...draft, title, purpose, prompt });
+    setAssessments((current) => [assessment, ...current]);
+    setApplications((current) => syncAssessmentIntoApplications(current, assessment));
+  }
+
+  function transitionAssessment(assessmentId: string, transform: (assessment: Assessment) => Assessment) {
+    const currentAssessment = assessments.find((assessment) => assessment.id === assessmentId);
+    if (!currentAssessment) return;
+    const nextAssessment = transform(currentAssessment);
+    setAssessments((current) => current.map((assessment) => assessment.id === assessmentId ? nextAssessment : assessment));
+    setApplications((current) => syncAssessmentIntoApplications(current, nextAssessment));
+  }
+
   if (!session) {
     return (
       <LoginPage
@@ -210,8 +250,8 @@ export default function App() {
     <AppShell
       activeRoute={shellActiveRoute(route)}
       agentContext={agentContext}
-      agentTitle={route === "application-detail" ? "申请 AI 工作区" : route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
-      agentSubtitle={route === "application-detail" ? "候选人、流程状态和下一步" : route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
+      agentTitle={route === "assessments" ? "Assessment Agent" : route === "application-detail" ? "申请 AI 工作区" : route === "job-detail" ? "Job AI Workspace" : route === "jobs" ? "岗位 Agent" : "HireOS Agent"}
+      agentSubtitle={route === "assessments" ? "Rubric and evidence" : route === "application-detail" ? "候选人、流程状态和下一步" : route === "job-detail" ? "Role setup and workflow checks" : route === "jobs" ? "流程与 Scorecard 设置" : "Workflow and evidence"}
       onNavigate={(nextRoute) => navigate(nextRoute)}
       onSignOut={() => {
         clearAuthState();
@@ -246,9 +286,24 @@ export default function App() {
         />
       ) : null}
       {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
-      {route === "applications" ? <ApplicationsPage applications={applications} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
-      {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} candidate={selectedApplicationCandidate} /> : null}
-      {isPlaceholderRoute(route) && route !== "application-detail" && route !== "applications" && route !== "candidates" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {route === "applications" ? <ApplicationsPage applications={applications} assessments={assessments} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
+      {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} assessments={assessments.filter((assessment) => assessment.applicationId === selectedApplication?.id)} candidate={selectedApplicationCandidate} /> : null}
+      {route === "assessments" ? (
+        <AssessmentsPage
+          applications={applications}
+          assessments={assessments}
+          onAcceptStopRule={(assessmentId) => transitionAssessment(assessmentId, (assessment) => acceptStopRule(assessment, "Evidence coverage is enough after v2."))}
+          onCalibrate={(assessmentId) => transitionAssessment(assessmentId, (assessment) => requireCalibration(assessment, "Rubric threshold needs human calibration."))}
+          onComplete={(assessmentId) => transitionAssessment(assessmentId, (assessment) => completeAssessment(assessment, "HR calibrated rubric and accepted the stop rule."))}
+          onCreateDraft={createAssessmentDraft}
+          onMarkReady={(assessmentId) => transitionAssessment(assessmentId, markAssessmentReady)}
+          onParseSubmission={(assessmentId) => transitionAssessment(assessmentId, parseAssessmentSubmission)}
+          onRecordSubmission={(assessmentId) => transitionAssessment(assessmentId, (assessment) => recordAssessmentSubmission(assessment, { attachments: ["backend-case-v2.zip", "architecture-notes.pdf"], emailThreadId: "email-thread-assessment-submit", submittedAt: new Date().toISOString(), version: "v2" }))}
+          onSend={(assessmentId) => transitionAssessment(assessmentId, (assessment) => sendAssessment(assessment, "email-thread-assessment-send"))}
+          onStartReview={(assessmentId) => transitionAssessment(assessmentId, startAssessmentReview)}
+        />
+      ) : null}
+      {isPlaceholderRoute(route) && route !== "application-detail" && route !== "applications" && route !== "assessments" && route !== "candidates" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -363,6 +418,7 @@ function AppShell({
           <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label="Jobs" onClick={() => onNavigate("jobs")} />
           <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label="Candidates" onClick={() => onNavigate("candidates")} />
           <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label="Applications" onClick={() => onNavigate("applications")} />
+          <NavButton active={activeRoute === "assessments"} icon={<FilePenLine />} label="Assessments" onClick={() => onNavigate("assessments")} />
           <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label="Inbox" onClick={() => onNavigate("inbox")} />
         </nav>
         <div className="nav-section">Intelligence</div>
@@ -810,22 +866,134 @@ function JobDetailPage({ applications, candidates, job, onAttachCandidate, onBac
   );
 }
 
-function ApplicationsPage({ applications, onOpenApplication }: { applications: Application[]; onOpenApplication: (applicationId: string) => void }) {
+function ApplicationsPage({ applications, assessments, onOpenApplication }: { applications: Application[]; assessments: Assessment[]; onOpenApplication: (applicationId: string) => void }) {
   return (
     <>
       <header className="topbar"><div className="page-title"><h1>Applications</h1><p>Pipeline Workbench with State, Owner, Next Action, SLA, timeline and owner load.</p></div></header>
       <section className="page-content">
         <div className="secondary-tabs">{["Applications", "Candidate Profile", "Timeline", "Email Threads", "Interviews", "Assessments", "Decisions"].map((tab, index) => <button className={`secondary-tab ${index === 0 ? "active" : ""}`} type="button" key={tab}>{tab}</button>)}</div>
-        <section className="metric-grid"><Metric label="Open Applications" value={String(applications.length)} detail="Created only after Candidate + Job binding" /><Metric label="Due Today" value={String(applications.filter((app) => app.slaStatus === "Today").length)} detail="SLA scan" warning={applications.some((app) => app.slaStatus === "Today")} /><Metric label="Owner Load" value={String(new Set(applications.map((app) => app.currentOwner)).size)} detail="Active owners" /><Metric label="Timeline Events" value={String(applications.reduce((sum, app) => sum + app.timeline.length, 0))} detail="Application history" /></section>
-        <section className="panel"><div className="panel-header"><div><h2>Pipeline Workbench</h2><p>State, Owner, Next Action, and SLA stay visible together.</p></div></div><div className="table apps-table workflow-table"><div className="table-row header"><span>Application</span><span>State</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>{applications.map((application) => <div className="table-row" key={application.id}><div className="cell-main"><strong>{application.candidateName}</strong><span>{application.jobTitle}</span></div><span>{application.currentState}</span><span>{application.currentOwner}</span><span>{application.nextAction}</span><span className={`pill ${application.slaStatus === "Today" ? "warn" : "green"}`}>{application.slaStatus} · {new Date(application.dueAt).toLocaleDateString("en-CA")}</span><button className="ghost-button row-action" type="button" onClick={() => onOpenApplication(application.id)}>Open Application for {application.candidateName}</button></div>)}</div>{applications.length === 0 ? <div className="empty-state">No Applications yet. Attach a Candidate to an Active Job first.</div> : null}</section>
+        <section className="metric-grid"><Metric label="Open Applications" value={String(applications.length)} detail="Created only after Candidate + Job binding" /><Metric label="Assessments" value={String(assessments.length)} detail={`${assessments.filter((assessment) => assessment.status === "Complete").length} complete`} /><Metric label="Due Today" value={String(applications.filter((app) => app.slaStatus === "Today").length)} detail="SLA scan" warning={applications.some((app) => app.slaStatus === "Today")} /><Metric label="Timeline Events" value={String(applications.reduce((sum, app) => sum + app.timeline.length, 0))} detail="Application history" /></section>
+        <section className="panel"><div className="panel-header"><div><h2>Pipeline Workbench</h2><p>State, Owner, Next Action, SLA, and assessment summary stay visible together.</p></div></div><div className="table apps-table workflow-table"><div className="table-row header"><span>Application</span><span>State</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>{applications.map((application) => {
+          const latestAssessment = assessments.find((assessment) => assessment.applicationId === application.id);
+          return <div className="table-row" key={application.id}><div className="cell-main"><strong>{application.candidateName}</strong><span>{application.jobTitle}{latestAssessment ? ` · ${latestAssessment.title} · ${latestAssessment.status}` : ""}</span></div><span>{application.currentState}</span><span>{application.currentOwner}</span><span>{application.nextAction}</span><span className={`pill ${application.slaStatus === "Today" ? "warn" : "green"}`}>{application.slaStatus} · {new Date(application.dueAt).toLocaleDateString("en-CA")}</span><button className="ghost-button row-action" type="button" onClick={() => onOpenApplication(application.id)}>Open Application for {application.candidateName}</button></div>;
+        })}</div>{applications.length === 0 ? <div className="empty-state">No Applications yet. Attach a Candidate to an Active Job first.</div> : null}</section>
         <section className="content-grid"><section className="panel"><div className="panel-header"><div><h2>Application Timeline</h2><p>Every created Application writes an initial timeline event.</p></div></div><div className="timeline">{applications.flatMap((application) => application.timeline.map((event) => <TimelineStep key={event.id} index={application.currentState} title={event.title} detail={`${application.candidateName} · ${event.detail}`} status={application.slaStatus} warn={application.slaStatus !== "Ready"} />))}</div></section><section className="panel"><div className="panel-header"><div><h2>Owner Load</h2><p>Owner and process accountability stay visible.</p></div></div><div className="cards">{Array.from(new Set(applications.map((application) => application.currentOwner))).map((owner) => <div className="work-card" key={owner}><div className="card-top"><div className="card-copy"><strong>{owner}</strong><span>{applications.filter((application) => application.currentOwner === owner).length} active applications</span></div><span className="pill green">Active</span></div></div>)}</div></section></section>
       </section>
     </>
   );
 }
 
-function ApplicationDetailPage({ application, candidate }: { application?: Application; candidate?: Candidate }) {
-  const [activeTab, setActiveTab] = useState<"basic" | "interview" | "questions">("interview");
+function AssessmentsPage({
+  applications,
+  assessments,
+  onAcceptStopRule,
+  onCalibrate,
+  onComplete,
+  onCreateDraft,
+  onMarkReady,
+  onParseSubmission,
+  onRecordSubmission,
+  onSend,
+  onStartReview
+}: {
+  applications: Application[];
+  assessments: Assessment[];
+  onAcceptStopRule: (assessmentId: string) => void;
+  onCalibrate: (assessmentId: string) => void;
+  onComplete: (assessmentId: string) => void;
+  onCreateDraft: (applicationId: string, title: string, purpose: string, prompt: string) => void;
+  onMarkReady: (assessmentId: string) => void;
+  onParseSubmission: (assessmentId: string) => void;
+  onRecordSubmission: (assessmentId: string) => void;
+  onSend: (assessmentId: string) => void;
+  onStartReview: (assessmentId: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"Review" | "Sent" | "Draft">("Review");
+  const [modalOpen, setModalOpen] = useState(false);
+  const reviewAssessments = assessments.filter((assessment) => ["Submitted", "Parsed", "In Review", "Calibrate", "Complete", "Skipped by Stop Rule"].includes(assessment.status));
+  const sentAssessments = assessments.filter((assessment) => ["Ready to Send", "Sent", "Candidate Question"].includes(assessment.status));
+  const draftAssessments = assessments.filter((assessment) => assessment.status === "Draft");
+  const visibleAssessments = activeTab === "Review" ? reviewAssessments : activeTab === "Sent" ? sentAssessments : draftAssessments;
+  const latestReview = assessments.find((assessment) => assessment.aiReview) ?? assessments[0];
+  const overdue = assessments.filter((assessment) => new Date(assessment.dueAt).getTime() < Date.now() && assessment.status !== "Complete").length;
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="page-title"><h1>Assessments</h1><p>题目、Rubric、提交、版本比较、AI Review、人工校准、Stop Rule 和下一步建议。</p></div>
+        <div className="top-actions"><button className="ghost-button" type="button" onClick={() => setModalOpen(true)}><FilePenLine aria-hidden="true" /> Draft rubric</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><SendHorizontal aria-hidden="true" /> Send assessment</button></div>
+      </header>
+      <section className="page-content">
+        <div className="hero-row"><section className="hero-panel"><h2>Assessments should close evidence gaps, not become extra process drag.</h2><p>Each assignment is tied to Scorecard criteria, candidate context, submitted artifacts, and a human-calibrated decision.</p></section><section className="hero-panel ai"><h2>Stop Rule suggestion</h2><p>{latestReview?.aiReview?.stopRuleRecommendation ?? "For Trang Nguyen, evidence coverage is high enough to move forward without another assignment round."}</p></section></div>
+        <section className="metric-grid"><Metric label="Open Assessments" value={String(assessments.filter((assessment) => assessment.status !== "Complete").length)} detail={`${reviewAssessments.length} require review`} /><Metric label="Submitted" value={String(assessments.filter((assessment) => assessment.submissions.length > 0).length)} detail="Parsed from email or attachment" /><Metric label="Avg Review Time" value="1.8d" detail="Mock review-time seam" /><Metric label="Overdue" value={String(overdue)} detail="Need HR follow-up" warning={overdue > 0} /></section>
+        <section className="panel">
+          <div className="panel-header"><div><h2>Assessment Workspace</h2><p>Submission status, rubric confidence, and next decision</p></div><div className="tabs">{(["Review", "Sent", "Draft"] as const).map((tab) => <button className={`tab ${activeTab === tab ? "active" : ""}`} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</div></div>
+          <div className="toolbar"><div className="search">Search candidate, job, rubric</div><span className="chip green"><Sparkles aria-hidden="true" /> Rubric linked</span><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> Create Assessment Draft</button></div>
+          <div className="table assessment-table">
+            <div className="table-row header"><span>Assessment</span><span>Rubric</span><span>Submission</span><span>AI Review</span><span>Status</span><span>Action</span></div>
+            {visibleAssessments.map((assessment) => (
+              <AssessmentWorkspaceRow
+                assessment={assessment}
+                key={assessment.id}
+                onAcceptStopRule={onAcceptStopRule}
+                onCalibrate={onCalibrate}
+                onComplete={onComplete}
+                onMarkReady={onMarkReady}
+                onParseSubmission={onParseSubmission}
+                onRecordSubmission={onRecordSubmission}
+                onSend={onSend}
+                onStartReview={onStartReview}
+              />
+            ))}
+          </div>
+          {visibleAssessments.length === 0 ? <div className="empty-state">No {activeTab.toLowerCase()} assessments yet.</div> : null}
+        </section>
+        <section className="content-grid">
+          <section className="panel"><div className="panel-header"><div><h2>Evidence Profile</h2><p>Rubric-linked signals</p></div></div><div className="cards">{assessments.flatMap((assessment) => assessment.evidenceEvents.map((event) => <div className="work-card ai" key={event.id}><div className="card-copy"><strong>{event.eventType.replaceAll("_", " ")}</strong><p>{event.summary}</p></div><div className="config-meta"><span className="pill green">{event.approvalStatus}</span><span className="pill">{event.sourceType}</span>{event.confidence ? <span className="pill">Rubric match {event.confidence}%</span> : null}</div></div>))}{assessments.every((assessment) => assessment.evidenceEvents.length === 0) ? <div className="work-card"><div className="card-copy"><strong>Debugging depth</strong><p>Candidate identified failure modes, rollback plan, and observability gaps.</p></div></div> : null}</div></section>
+          <section className="panel"><div className="panel-header"><div><h2>Follow-up Queue</h2><p>Assessment operations</p></div></div><div className="timeline">{assessments.filter((assessment) => assessment.status !== "Complete").map((assessment) => <TimelineStep key={assessment.id} index={assessment.status} title={assessment.title} detail={`${assessment.candidateName} · ${assessment.owner} owns ${assessment.status === "Sent" ? "candidate follow-up" : "rubric calibration"}`} status={assessment.status === "Calibrate" ? "Ready" : "HR"} warn={assessment.status === "Sent"} />)}{assessments.every((assessment) => assessment.status === "Complete") ? <TimelineStep index="Now" title="No pending assessment follow-up" detail="Completed assessments are visible in Application Timeline." status="Ready" /> : null}</div></section>
+        </section>
+      </section>
+      {modalOpen ? <AssessmentDraftModal applications={applications} onClose={() => setModalOpen(false)} onCreate={(applicationId, title, purpose, prompt) => { onCreateDraft(applicationId, title, purpose, prompt); setActiveTab("Draft"); setModalOpen(false); }} /> : null}
+    </>
+  );
+}
+
+function AssessmentWorkspaceRow({ assessment, onAcceptStopRule, onCalibrate, onComplete, onMarkReady, onParseSubmission, onRecordSubmission, onSend, onStartReview }: { assessment: Assessment; onAcceptStopRule: (assessmentId: string) => void; onCalibrate: (assessmentId: string) => void; onComplete: (assessmentId: string) => void; onMarkReady: (assessmentId: string) => void; onParseSubmission: (assessmentId: string) => void; onRecordSubmission: (assessmentId: string) => void; onSend: (assessmentId: string) => void; onStartReview: (assessmentId: string) => void }) {
+  return (
+    <div className="table-row">
+      <div className="cell-main"><strong>{assessment.title}</strong><span>{assessment.candidateName} · {assessment.jobTitle} · {assessment.submissions[0]?.attachments.join(", ") || "No submission yet"}</span></div>
+      <span className={`pill ${assessment.rubric.length >= 3 ? "green" : "warn"}`}>{assessment.rubric.length >= 3 ? "Complete" : "Partial"}</span>
+      <span>{assessment.submissions[0]?.parsedStatus ?? "Pending"}</span>
+      <span>{assessment.aiReview ? `Rubric match ${assessment.aiReview.rubricMatch}%` : "Not reviewed"}</span>
+      <span className={`pill ${assessment.status === "Calibrate" ? "warn" : assessment.status === "Complete" ? "green" : ""}`}>{assessment.status}</span>
+      <div className="row-actions">{assessment.status === "Draft" ? <button className="ghost-button row-action" type="button" onClick={() => onMarkReady(assessment.id)}>Mark {assessment.title} ready to send</button> : null}{assessment.status === "Ready to Send" ? <button className="ghost-button row-action" type="button" onClick={() => onSend(assessment.id)}>Send {assessment.title}</button> : null}{assessment.status === "Sent" ? <button className="ghost-button row-action" type="button" onClick={() => onRecordSubmission(assessment.id)}>Record submission for {assessment.title}</button> : null}{assessment.status === "Submitted" ? <button className="ghost-button row-action" type="button" onClick={() => onParseSubmission(assessment.id)}>Parse submission for {assessment.title}</button> : null}{assessment.status === "Parsed" ? <button className="ghost-button row-action" type="button" onClick={() => onStartReview(assessment.id)}>Start review for {assessment.title}</button> : null}{assessment.status === "In Review" ? <><button className="ghost-button row-action" type="button" onClick={() => onCalibrate(assessment.id)}>Calibrate {assessment.title}</button><button className="ghost-button row-action" type="button" onClick={() => onAcceptStopRule(assessment.id)}>Accept Stop Rule for {assessment.title}</button></> : null}{assessment.status === "Calibrate" || assessment.status === "Skipped by Stop Rule" ? <button className="ghost-button row-action" type="button" onClick={() => onComplete(assessment.id)}>Complete {assessment.title}</button> : null}</div>
+    </div>
+  );
+}
+
+function AssessmentTableRow({ assessment }: { assessment: Assessment }) {
+  return <div className="table-row"><div className="cell-main"><strong>{assessment.title}</strong><span>{assessment.submissions[0]?.attachments.join(", ") || assessment.purpose}</span></div><span className="pill green">{assessment.rubric.length ? "Complete" : "Partial"}</span><span>{assessment.submissions[0]?.parsedStatus ?? "Pending"}</span><span>{assessment.aiReview ? `${assessment.aiReview.confidence} · Rubric match ${assessment.aiReview.rubricMatch}%` : "Pending"}</span><span className={`pill ${assessment.status === "Calibrate" ? "warn" : "green"}`}>{assessment.status}</span></div>;
+}
+
+function AssessmentDraftModal({ applications, onClose, onCreate }: { applications: Application[]; onClose: () => void; onCreate: (applicationId: string, title: string, purpose: string, prompt: string) => void }) {
+  const [applicationId, setApplicationId] = useState(applications[0]?.id ?? "");
+  const [title, setTitle] = useState("Backend system design");
+  const [purpose, setPurpose] = useState("Close backend scorecard evidence gaps without adding process drag.");
+  const [prompt, setPrompt] = useState("Review an event-driven API failure and propose a rollback plan.");
+
+  return (
+    <div className="modal-backdrop">
+      <div className="mail-connect-modal candidate-modal" role="dialog" aria-modal="true" aria-label="Create Assessment Draft">
+        <header className="modal-header"><div><h2>Create Assessment Draft</h2><p>Bind the assessment to one Application and the Job scorecard before sending.</p></div><button className="icon-button" type="button" aria-label="关闭" onClick={onClose}><X aria-hidden="true" /></button></header>
+        <div className="connect-panels"><section className="connect-panel"><div className="job-form-grid"><label className="form-field wide"><span>Target Application</span><select aria-label="Target Application" value={applicationId} onChange={(event) => setApplicationId(event.target.value)}>{applications.map((application) => <option key={application.id} value={application.id}>{application.candidateName} · {application.jobTitle}</option>)}</select></label><FormInput label="Assessment title" value={title} onChange={setTitle} /><FormInput label="Purpose" value={purpose} onChange={setPurpose} /><label className="form-field wide"><span>Prompt</span><textarea aria-label="Prompt" rows={4} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></label></div></section></div>
+        <footer className="modal-footer"><button className="ghost-button" type="button" onClick={onClose}>取消</button><span className="footer-spacer" /><button className="primary-button" type="button" disabled={!applicationId} onClick={() => onCreate(applicationId, title, purpose, prompt)}>Create Draft</button></footer>
+      </div>
+    </div>
+  );
+}
+
+function ApplicationDetailPage({ application, assessments, candidate }: { application?: Application; assessments: Assessment[]; candidate?: Candidate }) {
+  const [activeTab, setActiveTab] = useState<"basic" | "interview" | "assessments" | "questions">("interview");
   const candidateName = candidate?.fullName ?? application?.candidateName ?? "Trang Nguyen";
   const jobTitle = application?.jobTitle ?? "高级后端工程师";
   const currentState = application?.currentState ?? "Founder Review";
@@ -842,6 +1010,7 @@ function ApplicationDetailPage({ application, candidate }: { application?: Appli
         <div className="secondary-tabs application-detail-tabs" aria-label="申请详情视图">
           <button className={`secondary-tab ${activeTab === "basic" ? "active" : ""}`} type="button" onClick={() => setActiveTab("basic")}><FileUser aria-hidden="true" /> 基本信息</button>
           <button className={`secondary-tab ${activeTab === "interview" ? "active" : ""}`} type="button" onClick={() => setActiveTab("interview")}><MessagesSquare aria-hidden="true" /> 面试流程</button>
+          <button className={`secondary-tab ${activeTab === "assessments" ? "active" : ""}`} type="button" onClick={() => setActiveTab("assessments")}><FilePenLine aria-hidden="true" /> Assessments</button>
           <button className={`secondary-tab ${activeTab === "questions" ? "active" : ""}`} type="button" onClick={() => setActiveTab("questions")}><FileQuestion aria-hidden="true" /> 生成题目</button>
         </div>
 
@@ -892,6 +1061,15 @@ function ApplicationDetailPage({ application, candidate }: { application?: Appli
           <div className="timeline">
             {(application?.timeline ?? []).map((event) => <TimelineStep key={event.id} index={event.title} title={event.title} detail={event.detail} status={application?.slaStatus ?? "Ready"} />)}
           </div>
+        </section>
+
+        <section className={`panel ${activeTab === "assessments" ? "" : "is-hidden"}`} data-application-detail-panel="assessments">
+          <div className="panel-header"><div><h2>Assessment Summary</h2><p>Assessment status, submission, AI review, and evidence events for this Application.</p></div></div>
+          <div className="table assessment-table">
+            <div className="table-row header"><span>Assessment</span><span>Rubric</span><span>Submission</span><span>AI Review</span><span>Status</span></div>
+            {assessments.map((assessment) => <AssessmentTableRow assessment={assessment} key={assessment.id} />)}
+          </div>
+          {assessments.length === 0 ? <div className="empty-state">No assessment attached to this Application yet.</div> : null}
         </section>
 
         <section className={`panel question-workspace ${activeTab === "questions" ? "" : "is-hidden"}`} data-application-detail-panel="questions">
@@ -1025,6 +1203,42 @@ function saveApplications(applications: Application[]) {
   saveLocalState(APPLICATIONS_KEY, applications);
 }
 
+function loadAssessments(): Assessment[] {
+  return loadLocalState(ASSESSMENTS_KEY, seedAssessments);
+}
+
+function saveAssessments(assessments: Assessment[]) {
+  saveLocalState(ASSESSMENTS_KEY, assessments);
+}
+
+function syncAssessmentIntoApplications(applications: Application[], assessment: Assessment): Application[] {
+  return applications.map((application) => {
+    if (application.id !== assessment.applicationId) return application;
+    const knownTimelineIds = new Set(application.timeline.map((event) => event.id));
+    const nextEvents = assessment.timelineEvents.filter((event) => !knownTimelineIds.has(event.id));
+    return {
+      ...application,
+      currentState: assessmentApplicationState(assessment.status),
+      currentOwner: assessment.status === "Sent" ? "Candidate" : assessment.status === "In Review" || assessment.status === "Calibrate" ? "HR / Founder" : application.currentOwner,
+      nextAction: assessmentNextAction(assessment),
+      timeline: [...application.timeline, ...nextEvents.map((event) => ({ ...event, detail: `${assessment.title}: ${event.detail}` }))]
+    };
+  });
+}
+
+function assessmentNextAction(assessment: Assessment): string {
+  if (assessment.status === "Draft") return "Review assessment draft";
+  if (assessment.status === "Ready to Send") return "Send assessment";
+  if (assessment.status === "Sent") return "Wait for candidate submission";
+  if (assessment.status === "Submitted") return "Parse assessment submission";
+  if (assessment.status === "Parsed") return "Start AI assessment review";
+  if (assessment.status === "In Review") return "Calibrate assessment result";
+  if (assessment.status === "Calibrate") return "Resolve rubric calibration";
+  if (assessment.status === "Skipped by Stop Rule") return "Confirm Stop Rule";
+  if (assessment.status === "Complete") return "Review assessment evidence";
+  return "Review assessment";
+}
+
 function loadLocalState<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -1068,7 +1282,7 @@ function shellActiveRoute(route: RouteId): ShellNavRoute {
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
-  if (route === "jobs" || route === "dashboard" || route === "candidates" || route === "applications" || route === "inbox" || route === "settings") return route;
+  if (route === "jobs" || route === "dashboard" || route === "candidates" || route === "applications" || route === "assessments" || route === "inbox" || route === "settings") return route;
   return "dashboard";
 }
 
@@ -1095,6 +1309,19 @@ function placeholderTabs(route: PlaceholderRoute): string[] {
 }
 
 function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): AgentContext {
+  if (route === "assessments") {
+    return {
+      recommendation: "Move Trang Nguyen forward and skip additional assessment.",
+      evidence: [
+        { label: "Evidence", value: "6 of 7 Backend scorecard areas covered." },
+        { label: "Risk", value: "Another assignment may reduce candidate response rate." },
+        { label: "Confidence", value: "High · rubric match 88%." }
+      ],
+      ask: "Ask about assessment evidence, rubric quality, submissions, or Stop Rule confidence.",
+      approveLabel: "Approve",
+      reviewLabel: "Open rubric"
+    };
+  }
   if (route === "application-detail") {
     return {
       recommendation: "可以询问候选人背景、面试状态、为什么建议进入终面，或让 AI 起草终面问题。",
