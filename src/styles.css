@@ -2742,6 +2742,83 @@ body.dock-expanded .agent-dock-prompts {
 }
 
 @media (max-width: 760px) {
+  .modal-backdrop {
+    padding: 16px;
+  }
+
+  .mail-connect-modal,
+  .job-create-modal,
+  .task-detail-modal {
+    width: min(100%, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+  }
+
+  .modal-header,
+  .modal-footer {
+    min-width: 0;
+    padding: 14px;
+  }
+
+  .modal-header > div,
+  .modal-footer > div {
+    min-width: 0;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .footer-spacer {
+    display: none;
+  }
+
+  .modal-footer button {
+    flex: 1 1 118px;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .modal-header h2,
+  .modal-header p,
+  .connect-panel,
+  .applicant-summary div,
+  .applicant-summary span,
+  .applicant-summary strong,
+  .rule-note,
+  .rule-note strong,
+  .rule-note span,
+  .work-card,
+  .card-copy,
+  .card-copy strong,
+  .card-copy span {
+    overflow-wrap: anywhere;
+  }
+
+  .task-detail-modal .connect-panels {
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 12px;
+  }
+
+  .task-detail-modal .task-detail-grid {
+    display: block;
+    width: auto;
+    gap: 12px;
+  }
+
+  .task-detail-modal .task-detail-grid > .connect-panel + .connect-panel {
+    margin-top: 12px;
+  }
+
+  .task-detail-modal .connect-panel,
+  .task-detail-modal .cards,
+  .task-detail-modal .work-card {
+    contain: inline-size;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .detail-grid,
   .settings-grid,
   .applicant-summary,
@@ -2839,9 +2916,19 @@ body.dock-expanded .agent-dock-prompts {
     overflow-x: auto;
   }
 
+  .tasks-page .secondary-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
   .secondary-tab,
   .filter-chip {
     flex: 0 0 auto;
+  }
+
+  .tasks-page .secondary-tab {
+    flex: 1 1 86px;
+    justify-content: center;
   }
 
   .card-top {

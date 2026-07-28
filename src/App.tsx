@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Activity,
   Archive,
@@ -120,6 +120,7 @@ import {
   evaluateAiAction,
   updateGovernanceState
 } from "./domain/governance";
+import { localizeDomTree } from "./i18n";
 import "./styles.css";
 
 type RouteId =
@@ -201,11 +202,11 @@ const appCopy = {
     accountMenu: "用户菜单",
     analytics: "分析",
     applications: "申请流程",
-    assessments: "测评",
+    assessments: "笔试/评估",
     candidates: "候选人",
     dashboard: "看板",
-    founderInbox: "创始人待办",
-    inbox: "待办箱",
+    founderInbox: "创始人收件箱",
+    inbox: "收件箱",
     intelligence: "智能",
     jobs: "岗位",
     language: "语言",
@@ -592,6 +593,7 @@ function AppShell({
   const [agentCollapsed, setAgentCollapsed] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const copy = appCopy[language];
 
   useEffect(() => {
@@ -603,8 +605,22 @@ function AppShell({
     };
   }, [sidebarCollapsed, agentCollapsed, dockOpen]);
 
+  useLayoutEffect(() => {
+    if (shellRef.current) localizeDomTree(shellRef.current, language);
+  });
+
+  useEffect(() => {
+    if (language === "EN" || !shellRef.current) return undefined;
+    const root = shellRef.current;
+    const observer = new MutationObserver(() => {
+      localizeDomTree(root, language);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [language]);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" ref={shellRef}>
       <aside className="sidebar" aria-label="主导航">
         <div className="brand">
           <button className="brand-mark sidebar-logo-toggle" aria-label="HireOS" title="HireOS" type="button">H</button>

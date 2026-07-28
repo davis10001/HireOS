@@ -55,6 +55,42 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
   });
 
+  it("localizes main recruiting pages when Chinese is selected", async () => {
+    window.history.pushState({}, "", "/dashboard");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    await user.click(screen.getByRole("button", { name: /account menu user menu for linh tran/i }));
+    await user.click(within(screen.getByLabelText("语言切换")).getByRole("button", { name: "中文" }));
+
+    expect(screen.getByRole("heading", { name: "今日首页" })).toBeInTheDocument();
+    expect(screen.getByText("每日重点")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "任务" }));
+    expect(screen.getByRole("heading", { name: "任务" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "全部任务" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "等待他人" })).toBeInTheDocument();
+    expect(screen.getByText("下一步")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "候选人" }));
+    expect(screen.getByRole("heading", { name: "候选人" })).toBeInTheDocument();
+    expect(screen.getByText("候选人库")).toBeInTheDocument();
+    expect(screen.getAllByText("重复项").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "岗位" }));
+    expect(screen.getByRole("heading", { name: "岗位" })).toBeInTheDocument();
+    expect(screen.getByText("活跃岗位")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "创始人收件箱" }));
+    expect(screen.getByRole("heading", { name: "创始人收件箱" })).toBeInTheDocument();
+    expect(screen.getByText("创始人任务")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
+    expect(screen.getByText("治理任务队列")).toBeInTheDocument();
+  });
+
   it("shows login validation errors and persists successful auth", async () => {
     const user = userEvent.setup();
     const { unmount } = renderApp();
