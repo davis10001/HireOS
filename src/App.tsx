@@ -42,6 +42,21 @@ import {
   validateLogin
 } from "./domain/auth";
 import {
+  Candidate,
+  CandidateAllocationState,
+  CandidateDraft,
+  createCandidateFromDraft,
+  createEmptyCandidateDraft,
+  detectCandidateDuplicate,
+  seedCandidates,
+  validateCandidateDraft
+} from "./domain/candidates";
+import {
+  Application,
+  createApplicationForCandidate,
+  seedApplications
+} from "./domain/applications";
+import {
   Job,
   JobDraft,
   JobStatus,
@@ -71,10 +86,12 @@ type RouteId =
   | "settings"
   | "settings-mailbox";
 
-type ShellNavRoute = "dashboard" | "jobs" | "inbox" | "analytics" | "settings";
+type ShellNavRoute = "dashboard" | "jobs" | "candidates" | "applications" | "inbox" | "analytics" | "settings";
 type PlaceholderRoute = Exclude<RouteId, "dashboard" | "jobs" | "job-detail">;
 
 const JOBS_KEY = "hireos.jobs";
+const CANDIDATES_KEY = "hireos.candidates";
+const APPLICATIONS_KEY = "hireos.applications";
 
 const placeholderLabels: Record<PlaceholderRoute, string> = {
   "application-detail": "Application Detail",
@@ -106,16 +123,28 @@ export default function App() {
   const [route, setRoute] = useState<RouteId>(() => readRouteFromLocation().route);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(() => readRouteFromLocation().jobId);
   const [jobs, setJobs] = useState<Job[]>(loadJobs);
+  const [candidates, setCandidates] = useState<Candidate[]>(loadCandidates);
+  const [applications, setApplications] = useState<Application[]>(loadApplications);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(() => readRouteFromLocation().applicationId);
 
   useEffect(() => {
     saveJobs(jobs);
   }, [jobs]);
 
   useEffect(() => {
+    saveCandidates(candidates);
+  }, [candidates]);
+
+  useEffect(() => {
+    saveApplications(applications);
+  }, [applications]);
+
+  useEffect(() => {
     const onPopState = () => {
       const next = readRouteFromLocation();
       setRoute(next.route);
       setSelectedJobId(next.jobId);
+      setSelectedApplicationId(next.applicationId);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -125,6 +154,37 @@ export default function App() {
     window.history.pushState({}, "", routeToPath(routeId, jobId));
     setRoute(routeId);
     setSelectedJobId(jobId ?? null);
+    setSelectedApplicationId(routeId === "application-detail" ? jobId ?? null : null);
+  }
+
+  function createCandidate(candidate: Candidate) {
+    setCandidates((current) => [candidate, ...current]);
+    if (candidate.allocationState === "assigned" && candidate.currentJobId) {
+      const job = jobs.find((item) => item.id === candidate.currentJobId);
+      if (job?.status === "active") {
+        setApplications((current) => [createApplicationForCandidate(candidate, job), ...current]);
+      }
+    }
+  }
+
+  function attachCandidateToJob(candidateId: string, jobId: string): Application | null {
+    const candidate = candidates.find((item) => item.id === candidateId);
+    const job = jobs.find((item) => item.id === jobId);
+    if (!candidate || !job || job.status !== "active" || candidate.allocationState === "duplicate_review") return null;
+    const existing = applications.find((application) => application.candidateId === candidateId && application.jobId === jobId);
+    if (existing) return existing;
+    const application = createApplicationForCandidate(candidate, job);
+    setApplications((current) => [application, ...current]);
+    setCandidates((current) => current.map((item) => item.id === candidateId ? { ...item, allocationState: "assigned", currentJobId: jobId, updatedAt: new Date().toISOString() } : item));
+    return application;
+  }
+
+  function markCandidateNotFit(candidateId: string, jobId: string) {
+    setCandidates((current) => current.map((item) => item.id === candidateId ? { ...item, allocationState: "not_fit_current_job", currentJobId: jobId, notFitReason: "Not Fit Current Job", updatedAt: new Date().toISOString() } : item));
+  }
+
+  function resolveDuplicateCandidate(candidateId: string) {
+    setCandidates((current) => current.map((item) => item.id === candidateId ? { ...item, allocationState: "unassigned_pool", currentJobId: null, poolReason: "Duplicate reviewed by HR", updatedAt: new Date().toISOString() } : item));
   }
 
   if (!session) {
@@ -142,7 +202,9 @@ export default function App() {
   }
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId);
-  const agentContext = buildAgentContext(route, selectedJob);
+  const selectedApplication = applications.find((application) => application.id === selectedApplicationId) ?? applications[0];
+  const selectedApplicationCandidate = selectedApplication ? candidates.find((candidate) => candidate.id === selectedApplication.candidateId) : undefined;
+  const agentContext = buildAgentContext(route, selectedJob, selectedApplicationCandidate);
 
   return (
     <AppShell
@@ -171,10 +233,22 @@ export default function App() {
         />
       ) : null}
       {route === "job-detail" ? (
-        <JobDetailPage job={selectedJob} onBack={() => navigate("jobs")} onOpenApplication={() => navigate("application-detail")} />
+        <JobDetailPage
+          applications={applications}
+          candidates={candidates}
+          job={selectedJob}
+          onAttachCandidate={(candidateId, jobId) => attachCandidateToJob(candidateId, jobId)}
+          onBack={() => navigate("jobs")}
+          onCreateCandidate={createCandidate}
+          onMarkNotFit={markCandidateNotFit}
+          onOpenApplication={(applicationId) => navigate("application-detail", applicationId)}
+          onResolveDuplicate={resolveDuplicateCandidate}
+        />
       ) : null}
-      {route === "application-detail" ? <ApplicationDetailPage /> : null}
-      {isPlaceholderRoute(route) && route !== "application-detail" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
+      {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
+      {route === "applications" ? <ApplicationsPage applications={applications} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
+      {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} candidate={selectedApplicationCandidate} /> : null}
+      {isPlaceholderRoute(route) && route !== "application-detail" && route !== "applications" && route !== "candidates" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
 }
@@ -287,6 +361,8 @@ function AppShell({
         <nav className="nav">
           <NavButton active={activeRoute === "dashboard"} icon={<LayoutDashboard />} label="Dashboard" onClick={() => onNavigate("dashboard")} />
           <NavButton active={activeRoute === "jobs"} count="12" icon={<BriefcaseBusiness />} label="Jobs" onClick={() => onNavigate("jobs")} />
+          <NavButton active={activeRoute === "candidates"} icon={<UsersRound />} label="Candidates" onClick={() => onNavigate("candidates")} />
+          <NavButton active={activeRoute === "applications"} icon={<Layers3 />} label="Applications" onClick={() => onNavigate("applications")} />
           <NavButton active={activeRoute === "inbox"} count="76" icon={<Inbox />} label="Inbox" onClick={() => onNavigate("inbox")} />
         </nav>
         <div className="nav-section">Intelligence</div>
@@ -566,8 +642,126 @@ function JobCreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   );
 }
 
-function JobDetailPage({ job, onBack, onOpenApplication }: { job?: Job; onBack: () => void; onOpenApplication: () => void }) {
+function CandidatesPage({ applications, candidates, jobs, onCreateCandidate, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; jobs: Job[]; onCreateCandidate: (candidate: Candidate) => void; onResolveDuplicate: (candidateId: string) => void }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const assigned = candidates.filter((candidate) => candidate.allocationState === "assigned");
+  const unassigned = candidates.filter((candidate) => candidate.allocationState === "unassigned_pool");
+  const notFit = candidates.filter((candidate) => candidate.allocationState === "not_fit_current_job" || candidate.allocationState === "rejected_global");
+  const duplicates = candidates.filter((candidate) => candidate.allocationState === "duplicate_review");
+
+  return (
+    <>
+      <header className="topbar"><div className="page-title"><h1>Candidates</h1><p>可复用候选人档案、联系方式、CV 历史、去重结果和跨岗位历史。</p></div><div className="top-actions"><button className="ghost-button" type="button">Import CV</button><button className="primary-button" type="button" onClick={() => setModalOpen(true)}><Plus aria-hidden="true" /> New Candidate</button></div></header>
+      <section className="page-content">
+        <div className="hero-row"><section className="hero-panel"><h2>Candidate is the person record. Applications keep the job-specific process separate.</h2><p>This prevents one candidate's multiple role histories from collapsing into a single vague status.</p></section><section className="hero-panel ai"><h2>Deduplication insight</h2><p>{duplicates.length} profiles need HR review before they can be assigned to a Job.</p></section></div>
+        <section className="metric-grid"><Metric label="Candidates" value={String(candidates.length)} detail={`${applications.length} job-bound applications`} /><Metric label="Assigned" value={String(assigned.length)} detail="Have at least one Application" /><Metric label="Unassigned" value={String(unassigned.length)} detail="People pool, no pipeline entry" /><Metric label="Duplicates" value={String(duplicates.length)} detail="Blocked from assignment" warning={duplicates.length > 0} /></section>
+        <section className="panel"><div className="panel-header"><div><h2>Candidate Registry</h2><p>Identity, source, CV history, and cross-job context</p></div><div className="tabs"><button className="tab active" type="button">All</button><button className="tab" type="button">Duplicates</button><button className="tab" type="button">High value</button></div></div><CandidateTable candidates={candidates} applications={applications} /></section>
+        <section className="content-grid">
+          <CandidatePoolPanel title="Assigned Candidates" detail="Candidates with one or more Job-bound Applications" candidates={assigned} applications={applications} empty="No assigned candidates yet." />
+          <CandidatePoolPanel title="Unassigned Pool" detail="Candidates saved without a Job. They must not appear in Applications Pipeline." candidates={unassigned} applications={applications} empty="No unassigned candidates." />
+          <CandidatePoolPanel title="Rejected / Not Fit Pool" detail="Not Fit Current Job keeps the person reusable for other Jobs." candidates={notFit} applications={applications} empty="No not-fit candidates." />
+          <CandidatePoolPanel title="Duplicate Review" detail="Duplicate candidates cannot be attached until HR resolves the review." candidates={duplicates} applications={applications} empty="No duplicates to review." onResolveDuplicate={onResolveDuplicate} />
+        </section>
+        <section className="panel"><div className="panel-header"><div><h2>Candidate History</h2><p>Cross-job Applications, pool state, not-fit history, and duplicate review remain attached to the person record.</p></div></div><div className="timeline">{candidates.map((candidate) => {
+          const candidateApplications = applications.filter((application) => application.candidateId === candidate.id);
+          const historyDetail = candidateApplications.length
+            ? candidateApplications.map((application) => `${application.jobTitle}: ${application.currentState}, ${application.currentOwner} owns ${application.nextAction}`).join(" · ")
+            : candidate.allocationState === "not_fit_current_job"
+              ? candidate.notFitReason || "Not Fit Current Job, reusable for other Jobs"
+              : candidate.allocationState === "duplicate_review"
+                ? candidate.poolReason || "Duplicate review blocks assignment"
+                : candidate.poolReason || "Saved to Unassigned Pool";
+          return <TimelineStep key={candidate.id} index={allocationLabel(candidate.allocationState)} title={candidate.fullName} detail={historyDetail} status={candidateApplications[0]?.slaStatus ?? (candidate.allocationState === "duplicate_review" ? "Review" : "Pool")} warn={candidate.allocationState === "duplicate_review"} />;
+        })}</div></section>
+      </section>
+      {modalOpen ? <NewCandidateModal candidates={candidates} jobs={jobs} onClose={() => setModalOpen(false)} onCreate={(candidate) => { onCreateCandidate(candidate); setModalOpen(false); }} /> : null}
+    </>
+  );
+}
+
+function CandidatePoolPanel({ applications, candidates, detail, empty, onResolveDuplicate, title }: { applications: Application[]; candidates: Candidate[]; detail: string; empty: string; onResolveDuplicate?: (candidateId: string) => void; title: string }) {
+  return <section className="panel"><div className="panel-header"><div><h2>{title}</h2><p>{detail}</p></div></div><div className="cards">{candidates.map((candidate) => <CandidateCard key={candidate.id} applications={applications} candidate={candidate} onResolveDuplicate={candidate.allocationState === "duplicate_review" ? onResolveDuplicate : undefined} />)}{candidates.length === 0 ? <div className="empty-state">{empty}</div> : null}</div></section>;
+}
+
+function CandidateTable({ applications, candidates }: { applications: Application[]; candidates: Candidate[] }) {
+  return (
+    <div className="table candidates-table">
+      <div className="table-row header"><span>Candidate</span><span>Source</span><span>Applications</span><span>Latest Evidence</span><span>Status</span></div>
+      {candidates.map((candidate) => (
+        <div className="table-row" key={candidate.id}><div className="person-row"><div className="avatar">{candidateInitials(candidate.fullName)}</div><div className="cell-main"><strong>{candidate.fullName}</strong><span>{candidate.primaryEmail || candidate.phone || "No contact yet"}</span></div></div><span>{candidate.source}</span><span>{applications.filter((application) => application.candidateId === candidate.id).length}</span><span>{candidate.cvNote || candidate.skillsSummary}</span><span className={`pill ${candidate.allocationState === "duplicate_review" ? "danger" : candidate.allocationState === "unassigned_pool" ? "warn" : "green"}`}>{allocationLabel(candidate.allocationState)}</span></div>
+      ))}
+    </div>
+  );
+}
+
+function CandidateCard({ applications, candidate, onResolveDuplicate }: { applications: Application[]; candidate: Candidate; onResolveDuplicate?: (candidateId: string) => void }) {
+  const appCount = applications.filter((application) => application.candidateId === candidate.id).length;
+  return <div className="work-card"><div className="card-top"><div className="card-copy"><strong>{candidate.fullName}</strong><span>{candidate.currentTitle || "Candidate"} · {candidate.location || "Location pending"} · {appCount} applications</span></div><span className={`pill ${candidate.allocationState === "duplicate_review" ? "danger" : candidate.allocationState === "unassigned_pool" ? "warn" : "green"}`}>{allocationLabel(candidate.allocationState)}</span></div>{onResolveDuplicate ? <button className="ghost-button row-action" type="button" onClick={() => onResolveDuplicate(candidate.id)}>Resolve duplicate for {candidate.fullName}</button> : null}</div>;
+}
+
+function JobCandidateSection({ applications, candidates, onMarkNotFit, onOpenApplication, title }: { applications: Application[]; candidates: Candidate[]; onMarkNotFit?: (candidateId: string, jobId: string) => void; onOpenApplication?: (applicationId: string) => void; title: string }) {
+  return (
+    <section className="panel nested-panel">
+      <div className="panel-header"><div><h2>{title}</h2><p>Candidate identity is shown beside Application workflow state.</p></div></div>
+      <div className="table apps-table workflow-table">
+        <div className="table-row header"><span>候选人</span><span>状态</span><span>负责人</span><span>下一步</span><span>SLA</span><span>Action</span></div>
+        {candidates.map((candidate) => {
+          const application = applications.find((item) => item.candidateId === candidate.id);
+          return (
+            <div className="table-row" key={candidate.id}>
+              <div className="cell-main"><strong>{candidate.fullName}</strong><span>{candidate.cvNote || candidate.skillsSummary}</span></div>
+              <span>{application?.currentState ?? allocationLabel(candidate.allocationState)}</span>
+              <span>{application?.currentOwner ?? "HR"}</span>
+              <span>{application?.nextAction ?? "Review later fit"}</span>
+              <span className={`pill ${application?.slaStatus === "Today" ? "warn" : "green"}`}>{application?.slaStatus ?? "保留"}</span>
+              <div className="row-actions">{application && onOpenApplication ? <button className="ghost-button row-action" type="button" onClick={() => onOpenApplication(application.id)}>Open Application for {candidate.fullName}</button> : null}{application && onMarkNotFit ? <button className="ghost-button row-action" type="button" onClick={() => onMarkNotFit(candidate.id, application.jobId)}>Not Fit Current Job for {candidate.fullName}</button> : null}</div>
+            </div>
+          );
+        })}
+        {candidates.length === 0 ? <div className="empty-state">No candidates in this group.</div> : null}
+      </div>
+    </section>
+  );
+}
+
+function NewCandidateModal({ candidates, jobs, onClose, onCreate }: { candidates: Candidate[]; jobs: Job[]; onClose: () => void; onCreate: (candidate: Candidate) => void }) {
+  const activeJobs = jobs.filter((job) => job.status === "active");
+  const [draft, setDraft] = useState<CandidateDraft>(() => createEmptyCandidateDraft());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [jobId, setJobId] = useState(activeJobs[0]?.id ?? "");
+
+  function update<K extends keyof CandidateDraft>(key: K, value: CandidateDraft[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function submit(choice: "pool" | "job") {
+    const duplicate = detectCandidateDuplicate(draft, candidates);
+    const nextDraft: CandidateDraft = {
+      ...draft,
+      allocationState: duplicate ? "duplicate_review" : choice === "job" ? "assigned" : "unassigned_pool",
+      currentJobId: duplicate ? null : choice === "job" ? jobId : null,
+      poolReason: duplicate ? `Duplicate ${duplicate.field} match requires HR review` : draft.poolReason
+    };
+    const nextErrors = validateCandidateDraft(nextDraft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    onCreate(createCandidateFromDraft(nextDraft));
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="mail-connect-modal candidate-modal" role="dialog" aria-modal="true" aria-label="New Candidate">
+        <header className="modal-header"><div><h2>New Candidate</h2><p>Create a reusable person record, then save to pool or bind to an Active Job.</p></div><button className="icon-button" type="button" aria-label="关闭" onClick={onClose}><X aria-hidden="true" /></button></header>
+        <div className="connect-panels"><section className="connect-panel"><div className="job-form-grid"><FormInput label="Full name" value={draft.fullName} onChange={(value) => update("fullName", value)} error={errors.fullName} /><FormInput label="Email" value={draft.primaryEmail} onChange={(value) => update("primaryEmail", value)} /><FormInput label="Phone" value={draft.phone} onChange={(value) => update("phone", value)} /><FormInput label="Source" value={draft.source} onChange={(value) => update("source", value)} /><FormInput label="Current title" value={draft.currentTitle} onChange={(value) => update("currentTitle", value)} /><FormInput label="Current company" value={draft.currentCompany} onChange={(value) => update("currentCompany", value)} /><FormInput label="Location" value={draft.location} onChange={(value) => update("location", value)} /><label className="form-field"><span>Attach to Active Job</span><select aria-label="Attach to Active Job" value={jobId} onChange={(event) => setJobId(event.target.value)}>{activeJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select></label><label className="form-field wide"><span>Skills summary</span><textarea aria-label="Skills summary" rows={3} value={draft.skillsSummary} onChange={(event) => update("skillsSummary", event.target.value)} /></label><label className="form-field wide"><span>CV/evidence note</span><textarea aria-label="CV/evidence note" rows={3} value={draft.cvNote} onChange={(event) => update("cvNote", event.target.value)} /></label></div></section></div>
+        <footer className="modal-footer"><button className="ghost-button" type="button" onClick={onClose}>取消</button><span className="footer-spacer" /><button className="ghost-button" type="button" onClick={() => submit("pool")}>Save to Unassigned Pool</button><button className="primary-button" type="button" onClick={() => submit("job")}>Create and Attach Candidate</button></footer>
+      </div>
+    </div>
+  );
+}
+
+function JobDetailPage({ applications, candidates, job, onAttachCandidate, onBack, onCreateCandidate, onMarkNotFit, onOpenApplication, onResolveDuplicate }: { applications: Application[]; candidates: Candidate[]; job?: Job; onAttachCandidate: (candidateId: string, jobId: string) => Application | null; onBack: () => void; onCreateCandidate: (candidate: Candidate) => void; onMarkNotFit: (candidateId: string, jobId: string) => void; onOpenApplication: (applicationId: string) => void; onResolveDuplicate: (candidateId: string) => void }) {
   const [activeTab, setActiveTab] = useState<"candidates" | "details">("candidates");
+  const [candidateModalOpen, setCandidateModalOpen] = useState(false);
 
   if (!job) {
     return (
@@ -577,6 +771,12 @@ function JobDetailPage({ job, onBack, onOpenApplication }: { job?: Job; onBack: 
       </>
     );
   }
+
+  const jobApplications = applications.filter((application) => application.jobId === job.id);
+  const assignedCandidates = candidates.filter((candidate) => candidate.allocationState === "assigned" && jobApplications.some((application) => application.candidateId === candidate.id));
+  const unassignedCandidates = candidates.filter((candidate) => candidate.allocationState === "unassigned_pool");
+  const notFitCandidates = candidates.filter((candidate) => candidate.allocationState === "not_fit_current_job" && candidate.currentJobId === job.id);
+  const duplicateCandidates = candidates.filter((candidate) => candidate.allocationState === "duplicate_review");
 
   return (
     <>
@@ -590,13 +790,12 @@ function JobDetailPage({ job, onBack, onOpenApplication }: { job?: Job; onBack: 
           <button className={`secondary-tab ${activeTab === "details" ? "active" : ""}`} type="button" onClick={() => setActiveTab("details")}><BriefcaseBusiness aria-hidden="true" /> 岗位详情</button>
         </div>
         <section className={`unframed-section ${activeTab === "candidates" ? "" : "is-hidden"}`} data-job-detail-panel="candidates">
-          <div className="panel-header"><div><h2>候选人成员列表</h2><p>当前岗位下的候选人、流程状态、负责人和下一步动作</p></div></div>
-          <div className="table apps-table">
-            <div className="table-row header"><span>候选人</span><span>状态</span><span>负责人</span><span>下一步</span><span>SLA</span></div>
-            <button className="table-row table-row-button" type="button" onClick={onOpenApplication}><div className="cell-main"><strong>Trang Nguyen</strong><span>7 个证据事件 · 1 个测评</span></div><span>创始人审核</span><span>Founder</span><span>批准终面</span><span className="pill warn">今天</span></button>
-            <div className="table-row"><div className="cell-main"><strong>Anh Le</strong><span>面试反馈混合 · 存在证据缺口</span></div><span>面试</span><span>Mai Ho</span><span>收集反馈</span><span className="pill danger">逾期</span></div>
-            <div className="table-row"><div className="cell-main"><strong>Minh Pham</strong><span>Offer 证据完整</span></div><span>Offer 决策</span><span>Founder</span><span>决策</span><span className="pill green">就绪</span></div>
-          </div>
+          <div className="panel-header"><div><h2>候选人成员列表</h2><p>当前岗位下的候选人、流程状态、负责人和下一步动作</p></div><button className="ghost-button" type="button" disabled={job.status !== "active"} onClick={() => setCandidateModalOpen(true)}>Create and attach Candidate</button></div>
+          <JobCandidateSection title="Assigned Candidates" candidates={assignedCandidates} applications={jobApplications} onMarkNotFit={onMarkNotFit} onOpenApplication={onOpenApplication} />
+          <section className="panel nested-panel"><div className="panel-header"><div><h2>Unassigned Pool</h2><p>Attach an existing Candidate to this Active Job to create an Application.</p></div></div><div className="table apps-table"><div className="table-row header"><span>Candidate</span><span>Source</span><span>Confidence</span><span>Pool Reason</span><span>Action</span></div>{unassignedCandidates.map((candidate) => <div className="table-row" key={candidate.id}><div className="cell-main"><strong>{candidate.fullName}</strong><span>{candidate.skillsSummary || candidate.cvNote}</span></div><span>{candidate.source}</span><span>{candidate.matchConfidence || "Manual"}</span><span>{candidate.poolReason || "Saved to pool"}</span><button className="ghost-button row-action" type="button" disabled={job.status !== "active"} onClick={() => onAttachCandidate(candidate.id, job.id)}>Attach {candidate.fullName} to this Job</button></div>)}{unassignedCandidates.length === 0 ? <div className="empty-state">No unassigned candidates available.</div> : null}</div></section>
+          <JobCandidateSection title="Rejected / Not Fit Pool" candidates={notFitCandidates} applications={jobApplications} />
+          <section className="panel nested-panel"><div className="panel-header"><div><h2>Duplicate Review</h2><p>Duplicate candidates cannot be attached until HR resolves identity.</p></div></div><div className="cards">{duplicateCandidates.map((candidate) => <CandidateCard key={candidate.id} applications={applications} candidate={candidate} onResolveDuplicate={onResolveDuplicate} />)}</div></section>
+          {jobApplications.map((application) => <div className="rule-note" key={application.id}><strong>{application.candidateName} attached to {application.jobTitle}</strong><span>Application created with owner, process owner, next action, due date and timeline.</span></div>)}
         </section>
         <section className={`detail-grid ${activeTab === "details" ? "" : "is-hidden"}`} data-job-detail-panel="details">
           <div className="detail-stack">
@@ -605,18 +804,39 @@ function JobDetailPage({ job, onBack, onOpenApplication }: { job?: Job; onBack: 
           </div>
           <section className="panel"><div className="panel-header"><div><h2>邮件匹配规则</h2><p>邮箱数据如何进入该岗位</p></div></div><div className="cards"><div className="work-card"><div className="card-top"><div className="card-copy"><strong>允许自动匹配</strong><span>只有活跃岗位会接收招聘邮箱中的高置信度 CV 匹配。</span></div><span className="pill green">On</span></div></div><div className="work-card"><div className="card-top"><div className="card-copy"><strong>匹配置信度阈值</strong><span>候选人、岗位和附件证据超过 85% 后才可自动创建申请。</span></div><span className="pill">85%</span></div></div><div className="work-card"><div className="card-top"><div className="card-copy"><strong>低置信度兜底</strong><span>模糊 CV 进入待办箱由 HR 确认，而不是静默创建数据。</span></div><span className="pill warn">待办箱</span></div></div></div></section>
         </section>
+        {candidateModalOpen ? <NewCandidateModal candidates={candidates} jobs={[job]} onClose={() => setCandidateModalOpen(false)} onCreate={(candidate) => { onCreateCandidate(candidate); setCandidateModalOpen(false); }} /> : null}
       </section>
     </>
   );
 }
 
-function ApplicationDetailPage() {
+function ApplicationsPage({ applications, onOpenApplication }: { applications: Application[]; onOpenApplication: (applicationId: string) => void }) {
+  return (
+    <>
+      <header className="topbar"><div className="page-title"><h1>Applications</h1><p>Pipeline Workbench with State, Owner, Next Action, SLA, timeline and owner load.</p></div></header>
+      <section className="page-content">
+        <div className="secondary-tabs">{["Applications", "Candidate Profile", "Timeline", "Email Threads", "Interviews", "Assessments", "Decisions"].map((tab, index) => <button className={`secondary-tab ${index === 0 ? "active" : ""}`} type="button" key={tab}>{tab}</button>)}</div>
+        <section className="metric-grid"><Metric label="Open Applications" value={String(applications.length)} detail="Created only after Candidate + Job binding" /><Metric label="Due Today" value={String(applications.filter((app) => app.slaStatus === "Today").length)} detail="SLA scan" warning={applications.some((app) => app.slaStatus === "Today")} /><Metric label="Owner Load" value={String(new Set(applications.map((app) => app.currentOwner)).size)} detail="Active owners" /><Metric label="Timeline Events" value={String(applications.reduce((sum, app) => sum + app.timeline.length, 0))} detail="Application history" /></section>
+        <section className="panel"><div className="panel-header"><div><h2>Pipeline Workbench</h2><p>State, Owner, Next Action, and SLA stay visible together.</p></div></div><div className="table apps-table workflow-table"><div className="table-row header"><span>Application</span><span>State</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>{applications.map((application) => <div className="table-row" key={application.id}><div className="cell-main"><strong>{application.candidateName}</strong><span>{application.jobTitle}</span></div><span>{application.currentState}</span><span>{application.currentOwner}</span><span>{application.nextAction}</span><span className={`pill ${application.slaStatus === "Today" ? "warn" : "green"}`}>{application.slaStatus} · {new Date(application.dueAt).toLocaleDateString("en-CA")}</span><button className="ghost-button row-action" type="button" onClick={() => onOpenApplication(application.id)}>Open Application for {application.candidateName}</button></div>)}</div>{applications.length === 0 ? <div className="empty-state">No Applications yet. Attach a Candidate to an Active Job first.</div> : null}</section>
+        <section className="content-grid"><section className="panel"><div className="panel-header"><div><h2>Application Timeline</h2><p>Every created Application writes an initial timeline event.</p></div></div><div className="timeline">{applications.flatMap((application) => application.timeline.map((event) => <TimelineStep key={event.id} index={application.currentState} title={event.title} detail={`${application.candidateName} · ${event.detail}`} status={application.slaStatus} warn={application.slaStatus !== "Ready"} />))}</div></section><section className="panel"><div className="panel-header"><div><h2>Owner Load</h2><p>Owner and process accountability stay visible.</p></div></div><div className="cards">{Array.from(new Set(applications.map((application) => application.currentOwner))).map((owner) => <div className="work-card" key={owner}><div className="card-top"><div className="card-copy"><strong>{owner}</strong><span>{applications.filter((application) => application.currentOwner === owner).length} active applications</span></div><span className="pill green">Active</span></div></div>)}</div></section></section>
+      </section>
+    </>
+  );
+}
+
+function ApplicationDetailPage({ application, candidate }: { application?: Application; candidate?: Candidate }) {
   const [activeTab, setActiveTab] = useState<"basic" | "interview" | "questions">("interview");
+  const candidateName = candidate?.fullName ?? application?.candidateName ?? "Trang Nguyen";
+  const jobTitle = application?.jobTitle ?? "高级后端工程师";
+  const currentState = application?.currentState ?? "Founder Review";
+  const currentOwner = application?.currentOwner ?? "Founder";
+  const nextAction = application?.nextAction ?? "批准终面";
+  const dueAt = application?.dueAt ? new Date(application.dueAt).toLocaleDateString("en-CA") : "今天到期";
 
   return (
     <>
       <header className="topbar">
-        <div className="page-title"><h1>Trang Nguyen · 高级后端工程师</h1><p>候选人基本信息、面试流程与状态、AI 下一步建议。</p></div>
+        <div className="page-title"><h1>{candidateName} · {jobTitle}</h1><p>候选人身份信息与 Application 流程状态分离展示。</p></div>
       </header>
       <section className="page-content">
         <div className="secondary-tabs application-detail-tabs" aria-label="申请详情视图">
@@ -631,10 +851,10 @@ function ApplicationDetailPage() {
         </section>
         <section className={`panel ${activeTab === "basic" ? "" : "is-hidden"}`} data-application-detail-panel="basic">
           <div className="panel-header"><div><h2>候选人基本信息</h2><p>申请身份、当前流程和完整简历详情</p></div></div>
-          <div className="applicant-summary"><div><span>申请人姓名</span><strong>Trang Nguyen</strong></div><div><span>面试岗位</span><strong>高级后端工程师</strong></div><div><span>招聘经理</span><strong>Linh Tran</strong></div><div><span>当前阶段</span><strong>创始人终面</strong></div><div><span>状态</span><strong>待安排 · 今天到期</strong></div></div>
+          <div className="applicant-summary"><div><span>Candidate Identity</span><strong>{candidateName}</strong></div><div><span>Application Workflow</span><strong>{jobTitle}</strong></div><div><span>Current Owner</span><strong>{currentOwner}</strong></div><div><span>Current State</span><strong>{currentState}</strong></div><div><span>Next Action</span><strong>{nextAction} · {dueAt}</strong></div></div>
           <section className="resume-detail-block">
-            <div className="resume-detail-head"><div><h3>简历详情</h3><p>Trang_Nguyen_Backend_CV.pdf · 2026-07-28 由 recruiting@company.vn 收到</p></div><button className="ghost-button" type="button"><Download aria-hidden="true" /> 下载原始简历</button></div>
-            <div className="resume-profile"><div><span>当前职位</span><strong>后端工程师</strong></div><div><span>核心经验</span><strong>金融科技 API、分布式系统、服务可靠性</strong></div><div><span>工作方式</span><strong>胡志明市 · 可接受混合办公</strong></div><div><span>语言协作</span><strong>英文技术沟通已确认</strong></div></div>
+            <div className="resume-detail-head"><div><h3>简历详情</h3><p>{candidateName.replace(/\s+/g, "_")}_CV.pdf · Candidate identity record remains reusable across Jobs</p></div><button className="ghost-button" type="button"><Download aria-hidden="true" /> 下载原始简历</button></div>
+            <div className="resume-profile"><div><span>当前职位</span><strong>{candidate?.currentTitle || "后端工程师"}</strong></div><div><span>核心经验</span><strong>{candidate?.skillsSummary || "金融科技 API、分布式系统、服务可靠性"}</strong></div><div><span>工作方式</span><strong>{candidate?.location || "胡志明市 · 可接受混合办公"}</strong></div><div><span>联系方式</span><strong>{candidate?.primaryEmail || candidate?.phone || "Contact pending"}</strong></div></div>
             <div className="resume-section-grid">
               <article><h4>技术栈</h4><p>Go、Node.js、PostgreSQL、Redis、Kafka、Docker、Kubernetes、AWS。熟悉高并发 API、异步任务、支付与风控相关服务。</p></article>
               <article><h4>项目经历</h4><p>主导金融科技平台账户与交易 API 重构，将关键接口延迟降低并提升可观测性；参与拆分单体服务到事件驱动架构。</p></article>
@@ -665,6 +885,12 @@ function ApplicationDetailPage() {
                 <div className="step-artifacts"><button className="primary-button" type="button"><BadgeCheck aria-hidden="true" /> 推进终面</button></div>
               </div>
             </article>
+          </div>
+        </section>
+        <section className={`panel ${activeTab === "interview" ? "" : "is-hidden"}`}>
+          <div className="panel-header"><div><h2>Application Timeline</h2><p>真实 Application 时间线，独立于 Candidate 身份信息。</p></div></div>
+          <div className="timeline">
+            {(application?.timeline ?? []).map((event) => <TimelineStep key={event.id} index={event.title} title={event.title} detail={event.detail} status={application?.slaStatus ?? "Ready"} />)}
           </div>
         </section>
 
@@ -761,36 +987,78 @@ function statusLabel(status: JobStatus): string {
   return ({ active: "Active", draft: "Draft", paused: "Paused", closed: "Closed" })[status];
 }
 
+function allocationLabel(status: CandidateAllocationState): string {
+  return ({
+    assigned: "Assigned",
+    duplicate_review: "Duplicate Review",
+    not_fit_current_job: "Not Fit Current Job",
+    rejected_global: "Rejected Global",
+    unassigned_pool: "Unassigned Pool"
+  })[status];
+}
+
+function candidateInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "C";
+}
+
 function loadJobs(): Job[] {
-  try {
-    const raw = window.localStorage.getItem(JOBS_KEY);
-    return raw ? (JSON.parse(raw) as Job[]) : seedJobs;
-  } catch {
-    return seedJobs;
-  }
+  return loadLocalState(JOBS_KEY, seedJobs);
 }
 
 function saveJobs(jobs: Job[]) {
+  saveLocalState(JOBS_KEY, jobs);
+}
+
+function loadCandidates(): Candidate[] {
+  return loadLocalState(CANDIDATES_KEY, seedCandidates);
+}
+
+function saveCandidates(candidates: Candidate[]) {
+  saveLocalState(CANDIDATES_KEY, candidates);
+}
+
+function loadApplications(): Application[] {
+  return loadLocalState(APPLICATIONS_KEY, seedApplications);
+}
+
+function saveApplications(applications: Application[]) {
+  saveLocalState(APPLICATIONS_KEY, applications);
+}
+
+function loadLocalState<T>(key: string, fallback: T): T {
   try {
-    window.localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLocalState<T>(key: string, value: T) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // Local persistence is best-effort for the prototype slice.
   }
 }
 
-function readRouteFromLocation(): { route: RouteId; jobId: string | null } {
+function readRouteFromLocation(): { route: RouteId; jobId: string | null; applicationId: string | null } {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
-  if (path === "/" || path === "/login" || path === "/dashboard") return { route: "dashboard", jobId: null };
-  if (path === "/jobs") return { route: "jobs", jobId: null };
-  if (path.startsWith("/jobs/")) return { route: "job-detail", jobId: decodeURIComponent(path.slice("/jobs/".length)) };
-  if (path === "/settings/mailbox") return { route: "settings-mailbox", jobId: null };
+  if (path === "/" || path === "/login" || path === "/dashboard") return { route: "dashboard", jobId: null, applicationId: null };
+  if (path === "/jobs") return { route: "jobs", jobId: null, applicationId: null };
+  if (path.startsWith("/jobs/")) return { route: "job-detail", jobId: decodeURIComponent(path.slice("/jobs/".length)), applicationId: null };
+  if (path === "/applications") return { route: "applications", jobId: null, applicationId: null };
+  if (path.startsWith("/applications/")) return { route: "application-detail", jobId: null, applicationId: decodeURIComponent(path.slice("/applications/".length)) };
+  if (path === "/application-detail") return { route: "application-detail", jobId: null, applicationId: null };
+  if (path === "/settings/mailbox") return { route: "settings-mailbox", jobId: null, applicationId: null };
   const route = path.slice(1) as RouteId;
-  return isPlaceholderRoute(route) ? { route, jobId: null } : { route: "dashboard", jobId: null };
+  return isPlaceholderRoute(route) ? { route, jobId: null, applicationId: null } : { route: "dashboard", jobId: null, applicationId: null };
 }
 
 function routeToPath(route: RouteId, jobId?: string): string {
   if (route === "dashboard") return "/dashboard";
   if (route === "job-detail") return `/jobs/${encodeURIComponent(jobId ?? "")}`;
+  if (route === "application-detail") return jobId ? `/applications/${encodeURIComponent(jobId)}` : "/application-detail";
   if (route === "settings-mailbox") return "/settings/mailbox";
   return `/${route}`;
 }
@@ -800,7 +1068,7 @@ function shellActiveRoute(route: RouteId): ShellNavRoute {
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
-  if (route === "jobs" || route === "dashboard" || route === "inbox" || route === "settings") return route;
+  if (route === "jobs" || route === "dashboard" || route === "candidates" || route === "applications" || route === "inbox" || route === "settings") return route;
   return "dashboard";
 }
 
@@ -826,11 +1094,12 @@ function placeholderTabs(route: PlaceholderRoute): string[] {
   return tabs[route] ?? ["Overview", "Timeline", "Agent context"];
 }
 
-function buildAgentContext(route: RouteId, job?: Job): AgentContext {
+function buildAgentContext(route: RouteId, job?: Job, candidate?: Candidate): AgentContext {
   if (route === "application-detail") {
     return {
       recommendation: "可以询问候选人背景、面试状态、为什么建议进入终面，或让 AI 起草终面问题。",
       evidence: [
+        { label: "Candidate", value: candidate?.fullName ?? "Selected application candidate" },
         { label: "建议", value: "推进创始人终面，不再增加测评。" },
         { label: "风险", value: "领导力缺口需要在终面覆盖。" },
         { label: "置信度", value: "高 · 已关联 7 个证据事件。" }

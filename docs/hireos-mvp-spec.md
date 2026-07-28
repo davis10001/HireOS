@@ -48,8 +48,13 @@ Create Job
 15. As an HR Member, I want AI to detect duplicate Candidate records using email, phone, CV hash, aliases and overlapping CV content, so that candidate history is not split.
 16. As an HR Member, I want duplicate Candidates to enter Duplicate Review, so that merges are confirmed by a human.
 17. As an HR Member, I want merged Candidates to preserve all CVs, sources, Email Threads and Applications, so that no recruiting history is lost.
+   Manual Candidate/Application baseline adds:
+   - As an HR Member, I want to manually create a Candidate and either keep the person in an Unassigned Pool or attach the person to an Active Job, so that HR can collect people before deciding their best role fit.
+   - As an HR Member, I want a Candidates tab from the person perspective, grouped into Assigned Candidates, Unassigned Pool and Rejected / Not Fit Pool, so that candidates are not hidden just because they are not yet attached to a Job.
+   - As an HR Member, I want to attach an existing Candidate to a Job from Job Detail, so that the system creates the Application only when a real Candidate + Job relationship exists.
+   - As an HR Member, I want to mark a Candidate as Not Fit Current Job without deleting the person, so that the candidate can remain available for other Jobs.
 18. As an HR Member, I want AI to match inbound Candidates to Active Jobs, so that relevant Applications can be created automatically when confidence is high.
-19. As an HR Member, I want low-confidence Candidate, Job or Application matches to become Inbox Items, so that ambiguous data does not silently pollute the pipeline.
+19. As an HR Member, I want low-confidence Candidate, Job or Application matches to become Inbox Items or Unassigned Pool records, so that ambiguous data does not silently pollute the pipeline.
 20. As an HR Member, I want high-confidence, low-risk AI Actions to Auto Apply, so that routine intake can move quickly.
 21. As an HR Member, I want sensitive AI Actions to require approval, so that AI cannot reject, hire, make an Offer Decision, merge candidates or send sensitive messages alone.
 22. As an HR Member, I want an Inbox with all work requiring review, so that low-confidence matches, duplicates, status updates, draft replies, Assessment reviews, Founder decisions and Blocked resolutions are handled in one place.
@@ -121,6 +126,9 @@ Create Job
 - AI may classify, summarize, extract evidence, recommend next actions and draft messages. AI must not automatically reject, hire, make Offer Decisions, decide compensation, delete evidence or hide low-confidence/counter-evidence.
 - Job activation requires configuration completeness: JD, Scorecard, Hiring Workflow, owner defaults and SLA rules.
 - Candidate duplicate handling preserves history. Merged Candidate records keep sources, CVs, Email Threads and Applications linked to the surviving Candidate.
+- Candidate is the person record and can exist without an Application. Candidate allocation states are `Unassigned Pool`, `Assigned`, `Not Fit Current Job`, `Rejected Global` and `Duplicate Review`.
+- Applications are created only when a Candidate is attached to a Job. A Candidate in `Unassigned Pool` must not appear in the Applications Pipeline.
+- `Not Fit Current Job` means the person does not fit one Job; it does not delete the Candidate or globally reject the person.
 - Analytics are event-based. Funnel, channel quality, execution efficiency and AI adoption metrics must derive from structured records and events, not static UI counts.
 - The prototype supplied the MVP information architecture and canonical surface areas: Dashboard, Jobs, Inbox, Email Agent, Applications, Candidates, Assessments, Founder Inbox, Blocked, Analytics and Settings.
 - The prototype also encodes the high-value state machine decisions below. These should be treated as product decisions, not just UI copy:

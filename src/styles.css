@@ -1358,6 +1358,10 @@ body.modal-open {
   grid-template-columns: minmax(190px, 1.4fr) minmax(86px, 0.8fr) minmax(82px, 0.7fr) minmax(106px, 0.9fr) minmax(74px, 0.6fr);
 }
 
+.workflow-table .table-row {
+  grid-template-columns: minmax(190px, 1.35fr) minmax(86px, 0.75fr) minmax(82px, 0.7fr) minmax(106px, 0.9fr) minmax(96px, 0.75fr) minmax(118px, 0.8fr);
+}
+
 .candidates-table .table-row {
   grid-template-columns: minmax(210px, 1.4fr) 110px 128px 120px 92px;
 }
@@ -2449,6 +2453,14 @@ body.dock-expanded .agent-dock-prompts {
   padding: 0 10px;
 }
 
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .jobs-table .table-row {
   grid-template-columns: minmax(220px, 1.6fr) 92px 120px 92px 110px 150px;
 }
@@ -2536,15 +2548,26 @@ body.dock-expanded .agent-dock-prompts {
 
 @media (max-width: 760px) {
   .detail-grid,
-  .settings-grid {
+  .settings-grid,
+  .applicant-summary,
+  .resume-detail-head,
+  .resume-profile,
+  .resume-section-grid,
+  .question-meta-grid,
+  .question-workspace-grid {
     grid-template-columns: 1fr;
   }
 
   .detail-grid,
   .detail-stack,
   .panel,
+  .nested-panel,
   .cards,
   .work-card,
+  .resume-detail-block,
+  .question-workspace,
+  .question-chat,
+  .question-list,
   .table,
   .table-row,
   .page-content > *,
@@ -2594,6 +2617,11 @@ body.dock-expanded .agent-dock-prompts {
 
   .row-action {
     justify-self: start;
+    width: 100%;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
     width: 100%;
   }
 

@@ -1,3 +1,5 @@
+import { slugify } from "./ids";
+
 export type JobStatus = "draft" | "active" | "paused" | "closed";
 export type JobPriority = "normal" | "high" | "urgent";
 
@@ -199,8 +201,4 @@ export function createJobFromDraft(draft: JobDraft): Job {
     generatedSummary: generated.generatedSummary,
     scorecard: generated.scorecard
   };
-}
-
-function slugify(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "new";
 }

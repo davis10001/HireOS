@@ -264,6 +264,13 @@ Create Job
 | source_summary | string | 否 | 来源摘要 |
 | duplicate_group_id | string | 否 | 重复候选人组 |
 | status | enum | 是 | Active / Duplicate Review / Merged / Archived |
+| allocation_state | enum | 是 | Unassigned Pool / Assigned / Not Fit Current Job / Rejected Global / Duplicate Review |
+| current_job_id | string | 否 | 当前主要分配岗位；未分配时为空 |
+| recommended_job_ids | array | 否 | AI 或 HR 推荐可匹配岗位 |
+| match_confidence | number | 否 | 当前推荐岗位匹配置信度 |
+| not_fit_reason | string | 否 | 不适合当前岗位原因 |
+| pool_reason | string | 否 | 进入公共池原因，如岗位不明确、低置信度、暂不匹配 |
+| cooldown_until | datetime | 否 | 暂不考虑或冷却到期时间 |
 | merged_into_candidate_id | string | 否 | 合并目标 |
 | created_by | string | 是 | 创建人或 AI |
 | created_at | datetime | 是 | 创建时间 |
@@ -646,6 +653,25 @@ Candidate Status 页面使用位置：
 - Duplicate Review。
 - Candidate Detail。
 - Email Agent 候选人匹配。
+
+#### 7.0.3.1 Candidate Allocation State
+
+Candidate Allocation State 描述“这个人当前是否被分配到岗位”。它是人的运营池状态，不等于招聘流程状态。招聘流程状态仍然只存在于 Application。
+
+| 状态 | 中文名 | 业务含义 | 进入条件 | 可执行动作 | 是否创建 Application |
+|---|---|---|---|---|---|
+| Unassigned Pool | 公共池 | 有候选人档案，但尚未绑定岗位 | 手动创建未选岗位、邮件解析岗位低置信度、猎头转发岗位不清晰 | 分配岗位、标记不适合、标记重复、归档 | 否 |
+| Assigned | 已分配 | Candidate 已绑定至少一个 Job，并产生 Application | HR 手动绑定 Active Job，或 AI 高置信度匹配经规则允许 | 打开 Application、推进流程、分配其它岗位 | 是 |
+| Not Fit Current Job | 不适合当前岗位 | 不适合当前岗位，但可保留到公共池或其它岗位 | HR 拒绝当前岗位匹配、AI 推荐不通过 | 移入公共池、推荐其它岗位、全局拒绝 | 否，或关闭当前 Application |
+| Rejected Global | 全局拒绝 | 该候选人不再进入后续招聘考虑 | 明确黑名单、长期不适合、合规原因 | 查看历史、恢复 | 否 |
+| Duplicate Review | 重复待审 | 分配前需要确认是否与已有 Candidate 重复 | 邮箱、电话、CV hash、姓名相似等重复信号 | 合并、保留新档案、忽略重复 | 否，直到人工确认 |
+
+页面使用位置：
+
+- Candidates 主页面：按 Assigned Candidates、Unassigned Pool、Rejected / Not Fit Pool 分组。
+- Job Detail 的 Candidates tab：以人的角度查看已分配到当前岗位的人、公共池推荐人、当前岗位不合适但可复用的人。
+- Inbox / Email Agent：低置信度岗位匹配先进入公共池或 Duplicate Review，不得静默创建 Application。
+- Application 创建：只有 Candidate 绑定 Job 时才创建 Application。
 
 #### 7.0.4 Application Status
 
@@ -1118,6 +1144,8 @@ Applied -> Reverted
 
 - Hiring Manager 查看岗位目标、预算、级别和成功标准。
 - HR 查看岗位下所有 Application。
+- HR 从人的角度查看当前岗位相关 Candidates：已分配、公共池推荐、不适合当前岗位但可复用。
+- HR 将公共池 Candidate 绑定到当前 Job，并生成 Application。
 - HR 调整岗位流程或 SLA。
 - Founder 查看岗位是否准备好继续接收 CV。
 
@@ -1125,7 +1153,13 @@ Applied -> Reverted
 
 - 岗位概要。
 - 岗位状态与配置完整性。
-- 候选人成员列表。
+- Candidates tab。
+- Assigned Candidates：已分配到当前岗位或其它岗位的人。
+- Unassigned Pool：已建档但未绑定岗位的人。
+- Rejected / Not Fit Pool：不适合当前岗位但可保留或推荐其它岗位的人。
+- 从公共池添加 Candidate 到当前 Job。
+- 创建新 Candidate 并绑定当前 Job。
+- Search existing Candidate 并绑定当前 Job。
 - 招聘需求。
 - 岗位目标。
 - 预算与级别。
@@ -1140,6 +1174,10 @@ Applied -> Reverted
 - 修改 Active Job 的 Scorecard、SLA、Workflow 需要记录审计。
 - 若修改影响已有 Application，系统必须提示是否应用到已有流程。
 - 邮件匹配规则变化只影响后续邮件，除非用户手动重新匹配历史邮件。
+- Candidate 绑定到 Active Job 时才创建 Application。
+- Candidate 未绑定 Job 时留在 Unassigned Pool，不进入 Applications Pipeline。
+- Candidate 标记为 Not Fit Current Job 时，不应删除 Candidate；可保留到公共池、推荐其它岗位，或在明确原因下全局拒绝。
+- 疑似重复 Candidate 必须先进入 Duplicate Review，人工确认前不能绑定岗位创建 Application。
 
 ### 8.4 Inbox
 
@@ -1302,10 +1340,14 @@ Applied -> Reverted
 
 ### 8.9 Candidates
 
-目标：维护可复用候选人档案、CV 历史和跨岗位历史。
+目标：从“人”的角度维护可复用候选人档案、分配状态、CV 历史和跨岗位历史。
 
 核心场景：
 
+- HR 手动建立 Candidate 档案，先保存到公共池，或立即绑定 Job。
+- HR 查看已分配 Candidates 与未分配公共池 Candidates。
+- HR 将 Candidate 分配到一个 Active Job 并创建 Application。
+- HR 判断 Candidate 不适合当前岗位，但保留到公共池以便未来匹配。
 - HR 查看候选人是否重复。
 - HR 合并猎头转发和候选人自投产生的重复记录。
 - HR 查看候选人曾经申请过哪些岗位。
@@ -1313,6 +1355,9 @@ Applied -> Reverted
 功能需求：
 
 - Candidate Registry。
+- Assigned Candidates。
+- Unassigned Pool。
+- Rejected / Not Fit Pool。
 - Duplicate Review。
 - Candidate History。
 - CV History。
@@ -1320,11 +1365,20 @@ Applied -> Reverted
 - Merge Recommendation。
 - 手动导入 CV。
 - 新建 Candidate。
+- 创建 Candidate 时选择：仅保存到公共池 / 绑定到已有 Job。
+- 从 Candidate 创建 Application。
+- 从 Job Detail 添加已有 Candidate。
+- Candidate 分配状态筛选。
 
 业务规则：
 
 - Candidate 不应直接承载招聘流程状态。
 - 流程状态必须在 Application 上。
+- Candidate 可以没有 Application，此时属于公共池。
+- 只有 Candidate 绑定 Job 时才创建 Application。
+- 同一 Candidate 可以绑定多个 Job，并产生多个互相独立的 Application。
+- Not Fit Current Job 只表示不适合某个岗位，不等于全局拒绝。
+- Rejected Global 才表示该 Candidate 不再进入后续招聘考虑。
 - 合并 Candidate 时保留所有 Email Thread、CV、Source、Application。
 - 合并操作必须人工确认和审计。
 

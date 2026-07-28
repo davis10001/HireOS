@@ -109,7 +109,8 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByRole("heading", { name: "Revenue Analyst" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /候选人/i })).toHaveClass("active");
     expect(screen.getByRole("heading", { name: "候选人成员列表" })).toBeInTheDocument();
-    expect(screen.getByText("Trang Nguyen")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Assigned Candidates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Unassigned Pool" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "邮件匹配规则" }).closest(".detail-grid")).toHaveClass("is-hidden");
 
     await user.click(screen.getByRole("button", { name: /岗位详情/i }));
@@ -122,23 +123,101 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(agent).getByText("Job AI Workspace")).toBeInTheDocument();
     expect(within(agent).getByText("Review the Assessment rubric before sending another case, then keep the job Active.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /trang nguyen/i }));
-    expect(screen.getByRole("heading", { name: "Trang Nguyen · 高级后端工程师" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /面试流程/i })).toHaveClass("active");
-    expect(screen.getByRole("heading", { name: "面试流程与状态" })).toBeInTheDocument();
-    expect(screen.getByText("推进终面")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Agent 对话区")).getByText("申请 AI 工作区")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /基本信息/i }));
-    expect(screen.getByRole("heading", { name: "候选人基本信息" })).toBeInTheDocument();
-    expect(screen.getByText("简历详情")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /生成题目/i }));
-    expect(screen.getByRole("heading", { name: "生成题目" })).toBeInTheDocument();
-    expect(screen.getByText("已生成题目")).toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: /account menu/i }));
     await user.click(screen.getByRole("button", { name: /sign out/i }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
+  });
+
+  it("creates a candidate in the pool, attaches to a job, and creates an application", async () => {
+    window.history.pushState({}, "", "/candidates");
+    const user = userEvent.setup();
+    renderApp();
+
+    await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+    await user.type(screen.getByLabelText(/password/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.getByRole("heading", { name: "Candidates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Candidate Registry" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Assigned Candidates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Unassigned Pool" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Rejected / Not Fit Pool" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Duplicate Review" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /new candidate/i }));
+    const modal = screen.getByRole("dialog", { name: /new candidate/i });
+    await user.type(within(modal).getByLabelText("Full name"), "Nora Le");
+    await user.type(within(modal).getByLabelText("Email"), "nora@example.com");
+    await user.type(within(modal).getByLabelText("Phone"), "+84 900 111 222");
+    await user.type(within(modal).getByLabelText("Source"), "Manual outreach");
+    await user.type(within(modal).getByLabelText("Current title"), "Backend Engineer");
+    await user.type(within(modal).getByLabelText("Location"), "Ho Chi Minh");
+    await user.type(within(modal).getByLabelText("Skills summary"), "Node.js, PostgreSQL, payment APIs");
+    await user.type(within(modal).getByLabelText("CV/evidence note"), "Strong API ownership evidence");
+    await user.click(within(modal).getByRole("button", { name: "Save to Unassigned Pool" }));
+
+    expect(screen.getAllByText("Nora Le").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    expect(screen.queryByText("Nora Le")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Jobs" }));
+    await user.click(screen.getByRole("button", { name: /open senior backend engineer/i }));
+    expect(screen.getByRole("heading", { name: "Unassigned Pool" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /attach nora le to this job/i }));
+    expect(screen.getByText("Nora Le attached to Senior Backend Engineer")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    expect(screen.getByText("Pipeline Workbench")).toBeInTheDocument();
+    expect(screen.getByText("Nora Le")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /open application for nora le/i }));
+    expect(screen.getByRole("heading", { name: "Nora Le · Senior Backend Engineer" })).toBeInTheDocument();
+    expect(screen.getByText("Candidate Identity")).toBeInTheDocument();
+    expect(screen.getByText("Application Workflow")).toBeInTheDocument();
+    expect(screen.getAllByText("Application created").length).toBeGreaterThan(0);
+  });
+
+  it("creates and attaches a candidate from Job Detail through the candidate modal", async () => {
+    window.history.pushState({}, "", "/jobs/job-backend");
+    const user = userEvent.setup();
+    renderApp();
+
+    await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+    await user.type(screen.getByLabelText(/password/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.getByRole("heading", { name: "Senior Backend Engineer" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create and attach Candidate" }));
+    const modal = screen.getByRole("dialog", { name: /new candidate/i });
+    await user.type(within(modal).getByLabelText("Full name"), "Omar Vo");
+    await user.type(within(modal).getByLabelText("Email"), "omar@example.com");
+    await user.type(within(modal).getByLabelText("Source"), "Manual referral");
+    await user.type(within(modal).getByLabelText("Skills summary"), "Backend systems and API ownership");
+    await user.click(within(modal).getByRole("button", { name: "Create and Attach Candidate" }));
+
+    expect(screen.getByText("Omar Vo attached to Senior Backend Engineer")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    expect(screen.getByText("Omar Vo")).toBeInTheDocument();
+  });
+
+  it("resolves duplicates before assignment and can mark a candidate not fit for the current job", async () => {
+    window.history.pushState({}, "", "/jobs/job-backend");
+    const user = userEvent.setup();
+    renderApp();
+
+    await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+    await user.type(screen.getByLabelText(/password/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.queryByRole("button", { name: /attach nora le to this job/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Resolve duplicate for Nora Le" }));
+    await user.click(screen.getByRole("button", { name: /attach nora le to this job/i }));
+    expect(screen.getByText("Nora Le attached to Senior Backend Engineer")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Not Fit Current Job for Nora Le" }));
+    expect(screen.getByRole("heading", { name: "Rejected / Not Fit Pool" })).toBeInTheDocument();
+    expect(screen.getAllByText("Nora Le").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    expect(screen.getByText(/Ready ·/)).toBeInTheDocument();
   });
 });
