@@ -20,3 +20,26 @@ This repository contains the product, architecture, UI guideline, front-end prot
 ## Status
 
 Initial project repository created from the local HireOS project materials and expanded with the current MVP PRD and front-end prototype.
+
+## Frontend
+
+Run the app:
+
+```bash
+npm install
+npm run dev
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Login accepts any valid email-like address and any password with at least 6 characters. The current runnable slice covers Login, the authenticated HireOS shell, Jobs, the four-step Job creation modal, and Job Detail. Other modules remain parity-preserving placeholders.
