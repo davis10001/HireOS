@@ -84,6 +84,19 @@ import {
   startAssessmentReview
 } from "./domain/assessments";
 import {
+  AiJobIntakeSession,
+  AiJobPackage,
+  aiJobIntakeFieldLabels,
+  applyJobPackageEdits,
+  approveJobPackage,
+  createAiJobIntakeSession,
+  generateJobPackage,
+  intakeAnswer,
+  requiredAiJobIntakeFields,
+  requestJobPackageRevision,
+  saveJobPackageDraft
+} from "./domain/job-intake";
+import {
   Job,
   JobDraft,
   JobStatus,
@@ -459,6 +472,7 @@ export default function App() {
           onOpenJob={(jobId) => {
             navigate("job-detail", jobId);
           }}
+          session={session}
         />
       ) : null}
       {route === "job-detail" ? (
@@ -938,9 +952,11 @@ function TaskDetailDialog({ onAction, onClose, onOpenApplication, task }: { onAc
   );
 }
 
-function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: (job: Job) => void; onOpenJob: (jobId: string) => void }) {
+function JobsPage({ jobs, onCreateJob, onOpenJob, session }: { jobs: Job[]; onCreateJob: (job: Job) => void; onOpenJob: (jobId: string) => void; session: AuthSession }) {
   const [statusFilter, setStatusFilter] = useState<JobStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState("");
   const metrics = buildJobMetrics(jobs);
   const filteredJobs = statusFilter === "all" ? jobs : jobs.filter((job) => job.status === statusFilter);
 
@@ -948,9 +964,13 @@ function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: 
     <>
       <header className="topbar">
         <div className="page-title"><h1>Jobs</h1><p>岗位状态、岗位 Tag、岗位成员、招聘流程和岗位级统计。</p></div>
-        <div className="top-actions"><button className="primary-button" onClick={() => setModalOpen(true)} type="button"><Plus aria-hidden="true" /> New Job</button></div>
+        <div className="top-actions">
+          <button className="ghost-button" onClick={() => setAiModalOpen(true)} type="button"><Sparkles aria-hidden="true" /> Create with AI</button>
+          <button className="primary-button" onClick={() => setModalOpen(true)} type="button"><Plus aria-hidden="true" /> New Job</button>
+        </div>
       </header>
       <section className="page-content">
+        {aiFeedback ? <div className="rule-note ai-job-feedback"><strong>AI approved package</strong><span>{aiFeedback}</span></div> : null}
         <section className="filter-strip" aria-label="岗位筛选">
           <div className="filter-row">
             <div className="filter-label">岗位筛选</div>
@@ -979,7 +999,7 @@ function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: 
         <section className="unframed-section">
           <div className="panel-header"><div><h2>岗位列表</h2><p>Job Pipeline keeps owner, status, headcount, and candidate counts in the original table container.</p></div></div>
           <div className="table jobs-table">
-            <div className="table-row header"><span>岗位名</span><span>状态</span><span>招聘经理</span><span>岗位人数</span><span>候选人数量</span></div>
+            <div className="table-row header"><span>岗位名</span><span>状态</span><span>招聘经理</span><span>岗位人数</span><span>候选人数量</span><span>AI Package</span></div>
             {filteredJobs.map((job) => (
               <div className="table-row" key={job.id}>
                 <div className="cell-main"><strong>{job.title}</strong><span>{job.department} · {job.employmentType}</span></div>
@@ -987,6 +1007,7 @@ function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: 
                 <span>{job.owner}</span>
                 <span>0/{job.headcount}</span>
                 <span>{job.applicationsCount}</span>
+                {job.packageApproval ? <span className="pill green">AI approved package</span> : <span>—</span>}
                 <button className="ghost-button row-action" type="button" onClick={() => onOpenJob(job.id)}>Open {job.title}</button>
               </div>
             ))}
@@ -995,7 +1016,170 @@ function JobsPage({ jobs, onCreateJob, onOpenJob }: { jobs: Job[]; onCreateJob: 
         </section>
       </section>
       {modalOpen ? <JobCreateModal onClose={() => setModalOpen(false)} onCreate={(job) => { onCreateJob(job); setModalOpen(false); }} /> : null}
+      {aiModalOpen ? (
+        <AiJobIntakeModal
+          approver={session.name}
+          onApprove={(job) => {
+            onCreateJob(job);
+            setAiFeedback(`${job.title} approved by ${job.packageApproval?.approver ?? session.name}; HR must publish manually from Tasks.`);
+            setAiModalOpen(false);
+          }}
+          onClose={() => setAiModalOpen(false)}
+        />
+      ) : null}
     </>
+  );
+}
+
+function AiJobIntakeModal({ approver, onApprove, onClose }: { approver: string; onApprove: (job: Job) => void; onClose: () => void }) {
+  const [need, setNeed] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [revision, setRevision] = useState("");
+  const [session, setSession] = useState<AiJobIntakeSession | null>(null);
+  const [notice, setNotice] = useState("");
+
+  const missingCount = session?.missingFields.length ?? requiredAiJobIntakeFields.length;
+  const canGenerate = session?.status === "ready_to_generate" || session?.status === "revision_requested";
+
+  function startIntake() {
+    if (!need.trim()) return;
+    setSession(createAiJobIntakeSession(need));
+    setNotice("");
+  }
+
+  function sendAnswer() {
+    if (!session || !answer.trim()) return;
+    const next = intakeAnswer(session, answer);
+    setSession(next);
+    setAnswer("");
+    setNotice(next.missingFields.length ? `${next.missingFields.length} required fields still missing.` : "All required fields are complete.");
+  }
+
+  function generatePackage() {
+    if (!session) return;
+    try {
+      setSession(generateJobPackage(session));
+      setNotice("Job Package generated for human review.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Missing required intake fields.");
+    }
+  }
+
+  function updatePackage<K extends keyof AiJobPackage>(key: K, value: AiJobPackage[K]) {
+    if (!session?.package) return;
+    setSession(applyJobPackageEdits(session, { [key]: value }, approver));
+  }
+
+  function saveDraft() {
+    if (!session?.package) return;
+    setSession(saveJobPackageDraft(session, approver));
+    setNotice("Draft saved with audit trail. It remains editable until approval.");
+  }
+
+  function requestRevision() {
+    if (!session?.package || !revision.trim()) return;
+    setSession(requestJobPackageRevision(session, revision));
+    setRevision("");
+    setNotice("AI revision applied. Review before approval.");
+  }
+
+  function approve() {
+    if (!session?.package) return;
+    const result = approveJobPackage(session, approver);
+    onApprove(result.job);
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="mail-connect-modal ai-job-modal" role="dialog" aria-modal="true" aria-labelledby="ai-job-title">
+        <header className="modal-header">
+          <div><h2 id="ai-job-title">Create Job with AI</h2><p>AI collects required role details, drafts the Job Package, and waits for human save or approval.</p></div>
+          <button className="icon-button" type="button" aria-label="Close AI job intake" onClick={onClose}><X aria-hidden="true" /></button>
+        </header>
+        <div className="ai-job-layout">
+          <section className="ai-job-chat" aria-label="AI intake conversation">
+            {!session ? (
+              <>
+                <label className="form-field wide">
+                  <span>Hiring need</span>
+                  <textarea aria-label="Hiring need" rows={5} value={need} onChange={(event) => setNeed(event.target.value)} placeholder="Describe the role in natural language..." />
+                </label>
+                <button className="primary-button" type="button" onClick={startIntake}><Sparkles aria-hidden="true" /> Start AI intake</button>
+              </>
+            ) : (
+              <>
+                <div className="ai-message assistant"><strong>AI follow-up</strong><p>{session.nextQuestion}</p></div>
+                <div className="ai-field-grid" aria-label="Required intake fields">
+                  {requiredAiJobIntakeFields.map((field) => {
+                    const complete = session.completedFields.includes(field);
+                    return <span className={`ai-field-chip ${complete ? "complete" : "missing"}`} key={field}>{aiJobIntakeFieldLabels[field]}</span>;
+                  })}
+                </div>
+                <p className="intake-status">{missingCount ? `${missingCount} required fields missing.` : "All required fields are complete."}</p>
+                <label className="form-field wide">
+                  <span>Your answer</span>
+                  <textarea aria-label="Your answer" rows={7} value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Answer the AI question or paste several missing details." />
+                </label>
+                <div className="inline-actions">
+                  <button className="ghost-button" type="button" onClick={sendAnswer}>Send answer</button>
+                  <button className="primary-button" disabled={!canGenerate} type="button" onClick={generatePackage}>Generate Job Package</button>
+                </div>
+              </>
+            )}
+            {notice ? <div className="rule-note compact"><strong>Status</strong><span>{notice}</span></div> : null}
+          </section>
+
+          <section className="ai-package-review" aria-label="Job Package review">
+            {session?.package ? (
+              <>
+                <PackageTextarea label="External JD" value={session.package.externalJd} onChange={(value) => updatePackage("externalJd", value)} />
+                <PackageTextarea label="Internal Role Brief" value={session.package.internalRoleBrief} onChange={(value) => updatePackage("internalRoleBrief", value)} />
+                <PackageListEditor label="Must-have" value={session.package.mustHave} onChange={(value) => updatePackage("mustHave", value)} />
+                <PackageListEditor label="Nice-to-have" value={session.package.niceToHave} onChange={(value) => updatePackage("niceToHave", value)} />
+                <PackageListEditor label="Knockout Criteria" value={session.package.knockoutCriteria} onChange={(value) => updatePackage("knockoutCriteria", value)} />
+                <PackageListEditor label="Scorecard" value={session.package.scorecard} onChange={(value) => updatePackage("scorecard", value)} />
+                <PackageListEditor label="Screening Questions" value={session.package.screeningQuestions} onChange={(value) => updatePackage("screeningQuestions", value)} />
+                <PackageListEditor label="Interview Plan" value={session.package.interviewPlan} onChange={(value) => updatePackage("interviewPlan", value)} />
+                <label className="form-field wide">
+                  <span>Revision instruction</span>
+                  <input aria-label="Revision instruction" value={revision} onChange={(event) => setRevision(event.target.value)} placeholder="Make it more senior, shorter, more operational..." />
+                </label>
+                <div className="audit-list" aria-label="AI audit trail">
+                  {session.auditTrail.map((event) => <span key={event.id}>{event.eventType} v{event.version} · {event.actor}</span>)}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">Complete the required fields to generate External JD, Internal Role Brief, Scorecard, Screening Questions, and Interview Plan.</div>
+            )}
+          </section>
+        </div>
+        <footer className="modal-footer ai-job-footer">
+          <button className="ghost-button" type="button" onClick={onClose}>Cancel</button>
+          <span className="footer-spacer" />
+          <button className="ghost-button" disabled={!session?.package || !revision.trim()} type="button" onClick={requestRevision}>Ask AI to revise</button>
+          <button className="ghost-button" disabled={!session?.package} type="button" onClick={saveDraft}><Save aria-hidden="true" /> Save Draft</button>
+          <button className="primary-button" disabled={!session?.package} type="button" onClick={approve}><BadgeCheck aria-hidden="true" /> Approve Job Package</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function PackageTextarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="form-field wide package-field">
+      <span>{label}</span>
+      <textarea aria-label={label} rows={4} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function PackageListEditor({ label, value, onChange }: { label: string; value: string[]; onChange: (value: string[]) => void }) {
+  return (
+    <label className="form-field wide package-field">
+      <span>{label}</span>
+      <textarea aria-label={label} rows={3} value={value.join("\n")} onChange={(event) => onChange(event.target.value.split("\n").map((item) => item.trim()).filter(Boolean))} />
+    </label>
   );
 }
 

@@ -578,6 +578,29 @@ function assessmentEmailTask(thread: (typeof seedEmailThreads)[number]): Recruit
 }
 
 function jobTask(job: Job): RecruitingTask {
+  if (job.packageApproval) {
+    return {
+      id: `task-job-approved-package-${job.id}`,
+      title: `Publish approved job: ${job.title}`,
+      sourceModule: "Jobs",
+      owner: job.owner,
+      ownerRole: "HR",
+      priority: "High",
+      status: "Open",
+      nextAction: "Review approved AI Job Package, confirm workflow defaults, then publish manually.",
+      dueAt: job.packageApproval.approvedAt,
+      slaState: "Ready",
+      relatedObjects: [{ module: "Jobs", id: job.id, label: job.title }],
+      allowedActions: [{ label: "Route workflow setup", kind: "route", targetStatus: "Routed" }],
+      aiRecommendation: "Human approval is complete; publishing remains a manual HR action.",
+      aiAutomationLevel: "L3",
+      aiApprovalRequired: false,
+      risk: "AI cannot publish the job automatically; HR must complete workflow and publishing checks.",
+      evidenceRefs: job.aiAuditTrail?.map((event) => `${event.eventType} v${event.version}`) ?? [],
+      batchReview: false
+    };
+  }
+
   return {
     id: `task-job-${job.id}`,
     title: `${job.title} workflow defaults`,

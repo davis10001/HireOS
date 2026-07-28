@@ -5,6 +5,7 @@ import { seedAssessments } from "./assessments";
 import { markAssessmentReady, parseAssessmentSubmission, recordAssessmentSubmission, sendAssessment, startAssessmentReview, acceptStopRule } from "./assessments";
 import { completeInterview, createInterviewForApplication } from "./interviews";
 import { seedJobs } from "./jobs";
+import { approveJobPackage, createAiJobIntakeSession, generateJobPackage, intakeAnswer } from "./job-intake";
 import {
   buildRecruitingTasks,
   completeTask,
@@ -195,5 +196,34 @@ describe("task contract", () => {
       "Approve AI candidate merge writeback",
       "Confirm offer decision writeback"
     ]);
+  });
+
+  it("emits a visible Jobs task for a human-approved AI Job Package", () => {
+    const approved = approveJobPackage(generateJobPackage(intakeAnswer(
+      createAiJobIntakeSession("Finance Director"),
+      [
+        "Hiring reason: board reporting and fundraising.",
+        "90 day goal: investor model live and reporting closed by day 5.",
+        "Responsibilities: FP&A, finance operations, controls, fundraising support.",
+        "Must-have: Vietnam finance leadership, English, fundraising support.",
+        "Budget: USD 6,000-8,000 monthly.",
+        "Location: Ho Chi Minh hybrid.",
+        "Reports to: Founder.",
+        "English: fluent for investor conversations.",
+        "Not fit: bookkeeping-only profile."
+      ].join("\n")
+    )), "Linh Tran", "2026-07-28T09:15:00.000Z");
+
+    const tasks = buildRecruitingTasks({ applications: [], assessments: [], jobs: [approved.job] });
+
+    expect(tasks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: `task-job-approved-package-${approved.job.id}`,
+        title: "Publish approved job: Finance Director",
+        sourceModule: "Jobs",
+        nextAction: "Review approved AI Job Package, confirm workflow defaults, then publish manually.",
+        evidenceRefs: ["generated v1", "approved v2"]
+      })
+    ]));
   });
 });

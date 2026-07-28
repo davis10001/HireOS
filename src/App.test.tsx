@@ -155,6 +155,49 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
   });
 
+  it("creates an approved AI Job Package from Jobs and routes publish work to Tasks", async () => {
+    window.history.pushState({}, "", "/jobs");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    await user.click(screen.getByRole("button", { name: /create with ai/i }));
+    const dialog = screen.getByRole("dialog", { name: /create job with ai/i });
+
+    await user.type(within(dialog).getByLabelText("Hiring need"), "We need a Finance Director for Vietnam finance operations and fundraising support.");
+    await user.click(within(dialog).getByRole("button", { name: /start ai intake/i }));
+    expect(within(dialog).getByText("Job title")).toHaveClass("complete");
+    expect(within(dialog).getByText("Hiring reason")).toHaveClass("missing");
+
+    await user.type(within(dialog).getByLabelText("Your answer"), [
+      "Hiring reason: board reporting and fundraising.",
+      "90 day goal: investor model live and reporting closed by day 5.",
+      "Responsibilities: FP&A, finance operations, controls, fundraising support.",
+      "Must-have: Vietnam finance leadership, English, fundraising support.",
+      "Budget: USD 6,000-8,000 monthly.",
+      "Location: Ho Chi Minh hybrid.",
+      "Reports to: Founder.",
+      "English: fluent for investor conversations.",
+      "Not fit: bookkeeping-only profile."
+    ].join("\n"));
+    await user.click(within(dialog).getByRole("button", { name: /send answer/i }));
+    expect(within(dialog).getAllByText("All required fields are complete.").length).toBeGreaterThan(0);
+
+    await user.click(within(dialog).getByRole("button", { name: /generate job package/i }));
+    expect(within(dialog).getByLabelText("External JD")).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText("Internal Role Brief"));
+    await user.type(within(dialog).getByLabelText("Internal Role Brief"), "Edited brief: prioritize fundraising model ownership.");
+    await user.click(within(dialog).getByRole("button", { name: /save draft/i }));
+    expect(within(dialog).getByText(/Draft saved/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: /approve job package/i }));
+    expect(screen.getByRole("button", { name: /open finance director/i })).toBeInTheDocument();
+    expect(screen.getAllByText("AI approved package").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("Publish approved job: Finance Director")).toBeInTheDocument();
+  });
+
   it("creates a candidate in the pool, attaches to a job, and creates an application", async () => {
     window.history.pushState({}, "", "/candidates");
     const user = userEvent.setup();

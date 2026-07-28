@@ -2657,7 +2657,125 @@ body.dock-expanded .agent-dock-prompts {
 }
 
 .jobs-table .table-row {
-  grid-template-columns: minmax(220px, 1.6fr) 92px 120px 92px 110px 150px;
+  grid-template-columns: minmax(220px, 1.6fr) 92px 120px 92px 110px minmax(112px, 0.8fr) 150px;
+}
+
+.ai-job-feedback {
+  margin-bottom: 16px;
+}
+
+.ai-job-modal {
+  width: min(1180px, calc(100vw - 64px));
+}
+
+.ai-job-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ai-job-chat,
+.ai-package-review {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 20px;
+}
+
+.ai-job-chat {
+  border-right: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+
+.ai-message {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.ai-message p {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.ai-field-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.ai-field-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.ai-field-chip.complete {
+  border-color: rgba(35, 140, 78, 0.28);
+  background: var(--green-soft);
+  color: var(--text);
+}
+
+.ai-field-chip.missing {
+  border-color: rgba(185, 121, 37, 0.32);
+  background: #fff8e8;
+}
+
+.intake-status {
+  margin: 0 0 12px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rule-note.compact {
+  margin-top: 14px;
+}
+
+.ai-package-review {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.package-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.audit-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.audit-list span {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ai-job-footer {
+  flex-wrap: wrap;
 }
 
 .login-page {
@@ -2847,5 +2965,44 @@ body.dock-expanded .agent-dock-prompts {
   .card-top {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+    place-items: stretch;
+  }
+
+  .ai-job-modal,
+  .job-create-modal,
+  .mail-connect-modal {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    border-radius: 14px;
+  }
+
+  .ai-job-layout {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .ai-job-chat {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header,
+  .modal-footer,
+  .ai-job-chat,
+  .ai-package-review {
+    padding: 14px;
+  }
+
+  .ai-job-footer .ghost-button,
+  .ai-job-footer .primary-button,
+  .inline-actions .ghost-button,
+  .inline-actions .primary-button,
+  .top-actions .ghost-button,
+  .top-actions .primary-button {
+    width: 100%;
   }
 }

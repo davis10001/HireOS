@@ -1,4 +1,5 @@
 import { slugify } from "./ids";
+import type { AiJobAuditEvent, AiJobPackage } from "./job-intake";
 
 export type JobStatus = "draft" | "active" | "paused" | "closed";
 export type JobPriority = "normal" | "high" | "urgent";
@@ -24,6 +25,13 @@ export interface Job {
   salaryRange: string;
   scorecard: string[];
   generatedSummary: string;
+  aiJobPackage?: AiJobPackage;
+  aiAuditTrail?: AiJobAuditEvent[];
+  packageApproval?: {
+    approver: string;
+    approvedAt: string;
+    version: number;
+  };
 }
 
 export interface JobDraft {
