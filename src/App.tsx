@@ -360,6 +360,7 @@ export default function App() {
   function recordTaskAction(task: RecruitingTask, actionLabel: string) {
     const completion = completeTask(task, actionLabel, session?.name ?? "Linh Tran");
     setTaskCompletions((current) => [completion, ...current.filter((item) => item.id !== task.id)]);
+    applyTaskSourceAction(task, actionLabel);
     const applicationRef = task.relatedObjects.find((item) => item.module === "Applications");
     if (applicationRef) {
       setApplications((current) => current.map((application) => {
@@ -379,6 +380,24 @@ export default function App() {
           ]
         };
       }));
+    }
+  }
+
+  function applyTaskSourceAction(task: RecruitingTask, actionLabel: string) {
+    const assessmentRef = task.relatedObjects.find((item) => item.module === "Assessments");
+    if (assessmentRef) {
+      if (actionLabel === "Mark ready to send") transitionAssessment(assessmentRef.id, markAssessmentReady);
+      if (actionLabel === "Send assessment") transitionAssessment(assessmentRef.id, (assessment) => sendAssessment(assessment, "email-thread-assessment-send"));
+      if (actionLabel === "Parse submission") transitionAssessment(assessmentRef.id, parseAssessmentSubmission);
+      if (actionLabel === "Start AI review") transitionAssessment(assessmentRef.id, startAssessmentReview);
+      if (actionLabel === "Confirm Stop Rule" || actionLabel === "Mark reviewed") transitionAssessment(assessmentRef.id, (assessment) => completeAssessment(assessment, "Task Center completed assessment review."));
+    }
+
+    const applicationRef = task.relatedObjects.find((item) => item.module === "Applications");
+    if (applicationRef && actionLabel === "Mark interview completed") {
+      const application = applications.find((item) => item.id === applicationRef.id);
+      const interview = application?.interviews?.find((item) => task.id.endsWith(item.id));
+      if (interview) markInterviewCompleted(applicationRef.id, interview.id);
     }
   }
 
@@ -422,7 +441,7 @@ export default function App() {
       taskCount={tasks.filter((task) => task.status !== "Completed" && task.status !== "Routed").length}
     >
       {route === "dashboard" ? <DashboardPage /> : null}
-      {route === "tasks" ? <TasksPage actor={{ name: session.name, role: session.role }} onTaskAction={recordTaskAction} tasks={tasks} /> : null}
+      {route === "tasks" ? <TasksPage actor={{ name: session.name, role: session.role }} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} onTaskAction={recordTaskAction} tasks={tasks} /> : null}
       {route === "jobs" ? (
         <JobsPage
           jobs={jobs}
@@ -700,7 +719,7 @@ function DashboardPage() {
   );
 }
 
-function TasksPage({ actor, onTaskAction, tasks }: { actor: { name: string; role: string }; onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
+function TasksPage({ actor, onOpenApplication, onTaskAction, tasks }: { actor: { name: string; role: string }; onOpenApplication: (applicationId: string) => void; onTaskAction: (task: RecruitingTask, actionLabel: string) => void; tasks: RecruitingTask[] }) {
   const [activeView, setActiveView] = useState<TaskView>("All Tasks");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const visibleTasks = filterTasks(tasks, activeView, actor);
@@ -761,12 +780,14 @@ function TasksPage({ actor, onTaskAction, tasks }: { actor: { name: string; role
           <section className="panel"><div className="panel-header"><div><h2>Related Work</h2><p>Task links show the source object without changing the owning module.</p></div></div><div className="cards">{tasks.slice(0, 4).map((task) => <div className="work-card" key={task.id}><div className="card-top"><div className="card-copy"><strong>{task.sourceModule} context</strong><span>{task.relatedObjects.map((item) => `${item.module}: ${item.label}`).join(" · ")}</span></div><span className={`pill ${task.priority === "Critical" ? "warn" : "green"}`}>{task.priority}</span></div></div>)}</div></section>
         </section>
       </section>
-      {selectedTask ? <TaskDetailDialog onAction={act} onClose={() => setSelectedTaskId(null)} task={selectedTask} /> : null}
+      {selectedTask ? <TaskDetailDialog onAction={act} onClose={() => setSelectedTaskId(null)} onOpenApplication={(applicationId) => { setSelectedTaskId(null); onOpenApplication(applicationId); }} task={selectedTask} /> : null}
     </>
   );
 }
 
-function TaskDetailDialog({ onAction, onClose, task }: { onAction: (task: RecruitingTask, actionLabel: string) => void; onClose: () => void; task: RecruitingTask }) {
+function TaskDetailDialog({ onAction, onClose, onOpenApplication, task }: { onAction: (task: RecruitingTask, actionLabel: string) => void; onClose: () => void; onOpenApplication: (applicationId: string) => void; task: RecruitingTask }) {
+  const applicationRef = task.relatedObjects.find((item) => item.module === "Applications");
+
   return (
     <div className="modal-backdrop">
       <div className="mail-connect-modal task-detail-modal" role="dialog" aria-modal="true" aria-label={task.title}>
@@ -787,6 +808,7 @@ function TaskDetailDialog({ onAction, onClose, task }: { onAction: (task: Recrui
         </div>
         <footer className="modal-footer">
           <button className="ghost-button" type="button" onClick={onClose}>Close</button>
+          {applicationRef ? <button className="ghost-button" type="button" onClick={() => onOpenApplication(applicationRef.id)}>Open Application context</button> : null}
           <span className="footer-spacer" />
           {task.allowedActions.map((action) => <button className={action.kind === "complete" ? "primary-button" : "ghost-button"} disabled={Boolean(task.completedAction)} key={action.label} type="button" onClick={() => onAction(task, action.label)}>{action.label}</button>)}
         </footer>

@@ -1,6 +1,7 @@
 import type { Application } from "./applications";
-import type { Assessment } from "./assessments";
+import type { Assessment, AssessmentStatus } from "./assessments";
 import { seedEmailThreads, seedInboxItems } from "./inbox";
+import type { Interview } from "./interviews";
 import type { Job } from "./jobs";
 
 export type TaskSourceModule = "Applications" | "Assessments" | "Inbox" | "Jobs";
@@ -49,6 +50,7 @@ export function buildRecruitingTasks(input: { applications: Application[]; asses
   const completions = new Map((input.completions ?? []).map((completion) => [completion.id, completion]));
   const tasks: RecruitingTask[] = [
     ...input.applications.map(applicationTask),
+    ...input.applications.flatMap(interviewTasks),
     ...input.assessments.map(assessmentTask),
     ...seedInboxItems.map(inboxTask),
     ...seedEmailThreads.filter((thread) => thread.detectedType === "Assessment").map(assessmentEmailTask),
@@ -103,29 +105,158 @@ function applicationTask(application: Application): RecruitingTask {
 }
 
 function assessmentTask(assessment: Assessment): RecruitingTask {
+  const state = assessmentTaskState(assessment.status);
   return {
-    id: `task-assessment-${assessment.id}`,
-    title: assessment.status === "Sent" ? "Assessment submission follow-up" : `${assessment.candidateName} assessment review`,
+    id: `task-assessment-${state.idSuffix}-${assessment.id}`,
+    title: state.title(assessment),
     sourceModule: "Assessments",
-    owner: assessment.status === "Sent" ? undefined : assessment.owner,
-    ownerRole: assessment.status === "Sent" ? "Candidate" : "HR",
-    priority: assessment.status === "Sent" ? "High" : "Normal",
-    status: assessment.status === "Sent" ? "Waiting on Others" : "Ready for Batch Review",
-    nextAction: assessment.status === "Sent" ? "Wait for candidate submission" : "Review rubric evidence",
+    owner: state.ownerRole ? undefined : assessment.owner,
+    ownerRole: state.ownerRole,
+    priority: state.priority,
+    status: state.status,
+    nextAction: state.nextAction(assessment),
     dueAt: assessment.dueAt,
-    slaState: assessment.status === "Sent" ? "Waiting" : "Ready",
+    slaState: state.slaState,
     relatedObjects: [
       { module: "Assessments", id: assessment.id, label: assessment.title },
       { module: "Applications", id: assessment.applicationId, label: `${assessment.candidateName} · ${assessment.jobTitle}` }
     ],
-    allowedActions: [
-      { label: "Send reminder", kind: "route", targetStatus: "Routed" },
-      { label: "Mark reviewed", kind: "complete", targetStatus: "Completed" }
-    ],
+    allowedActions: state.allowedActions,
     aiRecommendation: assessment.aiReview?.stopRuleRecommendation ?? "Keep the follow-up minimal and preserve assessment evidence on the Application timeline.",
     risk: assessment.aiReview?.risk ?? "Candidate response can stall if HR adds process without clear evidence value.",
     evidenceRefs: assessment.evidenceEvents.map((event) => event.summary),
-    batchReview: assessment.status !== "Sent"
+    batchReview: state.batchReview
+  };
+}
+
+function interviewTasks(application: Application): RecruitingTask[] {
+  return (application.interviews ?? [])
+    .filter((interview) => ["Scheduling", "Scheduled", "Feedback Pending"].includes(interview.status))
+    .map((interview) => interviewTask(application, interview));
+}
+
+function interviewTask(application: Application, interview: Interview): RecruitingTask {
+  const feedbackPending = interview.status === "Feedback Pending";
+  const scheduling = interview.status === "Scheduling";
+
+  return {
+    id: feedbackPending ? `task-interview-feedback-${interview.id}` : `task-interview-schedule-${interview.id}`,
+    title: feedbackPending ? `${application.candidateName} interview feedback overdue` : `${application.candidateName} ${interview.interviewType} interview ${scheduling ? "scheduling" : "scheduled"}`,
+    sourceModule: "Applications",
+    owner: feedbackPending || !scheduling ? interview.interviewer : "HR",
+    ownerRole: scheduling ? "HR" : "Interviewer",
+    priority: feedbackPending ? "Critical" : "High",
+    status: "Open",
+    nextAction: feedbackPending ? `Submit interview feedback for ${application.candidateName}` : scheduling ? `Confirm interview time with ${application.candidateName}` : `Conduct ${interview.interviewType} interview`,
+    dueAt: interview.scheduledStartAt,
+    slaState: feedbackPending ? "Overdue" : "Today",
+    relatedObjects: [
+      { module: "Applications", id: application.id, label: `${application.candidateName} · ${application.jobTitle}` }
+    ],
+    allowedActions: [
+      { label: feedbackPending ? "Submit feedback" : scheduling ? "Confirm schedule" : "Mark interview completed", kind: "complete", targetStatus: "Completed" }
+    ],
+    aiRecommendation: feedbackPending ? "Collect feedback before founder review uses interview evidence." : "Keep scheduling and interviewer ownership visible in Application context.",
+    risk: feedbackPending ? "Missing interview feedback blocks evidence quality and should stay visible as risk work." : "Interview progress can drift if scheduling work stays only on the Application detail page.",
+    evidenceRefs: application.timeline.filter((event) => event.eventType.startsWith("interview")).map((event) => event.title),
+    batchReview: false
+  };
+}
+
+function assessmentTaskState(status: AssessmentStatus): {
+  allowedActions: TaskAllowedAction[];
+  batchReview: boolean;
+  idSuffix: string;
+  nextAction: (assessment: Assessment) => string;
+  ownerRole?: string;
+  priority: TaskPriority;
+  slaState: RecruitingTask["slaState"];
+  status: TaskStatus;
+  title: (assessment: Assessment) => string;
+} {
+  if (status === "Draft") {
+    return {
+      allowedActions: [{ label: "Mark ready to send", kind: "complete", targetStatus: "Completed" }],
+      batchReview: true,
+      idSuffix: "draft",
+      nextAction: () => "Review assessment draft and rubric",
+      priority: "Normal",
+      slaState: "Ready",
+      status: "Ready for Batch Review",
+      title: (assessment) => `${assessment.candidateName} assessment draft review`
+    };
+  }
+  if (status === "Ready to Send") {
+    return {
+      allowedActions: [{ label: "Send assessment", kind: "complete", targetStatus: "Completed" }],
+      batchReview: false,
+      idSuffix: "ready",
+      nextAction: (assessment) => `Send assessment instructions to ${assessment.candidateName}`,
+      priority: "High",
+      slaState: "Today",
+      status: "Open",
+      title: (assessment) => `${assessment.candidateName} assessment ready to send`
+    };
+  }
+  if (status === "Sent" || status === "Candidate Question") {
+    return {
+      allowedActions: [{ label: "Send reminder", kind: "route", targetStatus: "Routed" }],
+      batchReview: false,
+      idSuffix: "sent",
+      nextAction: () => "Follow up for assessment submission",
+      ownerRole: "Candidate",
+      priority: "High",
+      slaState: "Waiting",
+      status: "Waiting on Others",
+      title: () => "Assessment submission follow-up"
+    };
+  }
+  if (status === "Submitted") {
+    return {
+      allowedActions: [{ label: "Parse submission", kind: "complete", targetStatus: "Completed" }],
+      batchReview: true,
+      idSuffix: "submission",
+      nextAction: () => "Parse candidate submission package",
+      priority: "High",
+      slaState: "Today",
+      status: "Ready for Batch Review",
+      title: (assessment) => `${assessment.candidateName} assessment submission review`
+    };
+  }
+  if (status === "Parsed") {
+    return {
+      allowedActions: [{ label: "Start AI review", kind: "complete", targetStatus: "Completed" }],
+      batchReview: true,
+      idSuffix: "review",
+      nextAction: () => "Start AI assessment review",
+      priority: "Normal",
+      slaState: "Ready",
+      status: "Ready for Batch Review",
+      title: (assessment) => `${assessment.candidateName} assessment AI review`
+    };
+  }
+  if (status === "Skipped by Stop Rule") {
+    return {
+      allowedActions: [{ label: "Confirm Stop Rule", kind: "complete", targetStatus: "Completed" }],
+      batchReview: false,
+      idSuffix: "stop-rule",
+      nextAction: () => "Confirm Stop Rule on the Application timeline",
+      ownerRole: "Founder",
+      priority: "High",
+      slaState: "Ready",
+      status: "Open",
+      title: (assessment) => `${assessment.candidateName} assessment stop-rule confirmation`
+    };
+  }
+  return {
+    allowedActions: [{ label: "Mark reviewed", kind: "complete", targetStatus: "Completed" }],
+    batchReview: true,
+    idSuffix: "calibration",
+    nextAction: () => "Calibrate assessment result and stop-rule recommendation",
+    priority: "Normal",
+    slaState: "Ready",
+    status: "Ready for Batch Review",
+    title: (assessment) => `${assessment.candidateName} assessment review`
   };
 }
 

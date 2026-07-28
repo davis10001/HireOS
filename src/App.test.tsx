@@ -447,6 +447,40 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByText(/Completed action: Route to HR review/i)).toBeInTheDocument();
     expect(screen.getByText(/Routed to HR review by Linh Tran/i)).toBeInTheDocument();
   });
+
+  it("opens interview and assessment tasks with Application context and completes source workflow actions", async () => {
+    window.history.pushState({}, "", "/applications");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+    await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
+    await user.click(screen.getByRole("button", { name: "Save interview" }));
+
+    await user.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("Trang Nguyen Technical interview scheduled")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /open trang nguyen technical interview scheduled/i }));
+    const interviewTask = screen.getByRole("dialog", { name: /trang nguyen technical interview scheduled/i });
+    expect(within(interviewTask).getByText("Applications: Trang Nguyen · Senior Backend Engineer")).toBeInTheDocument();
+
+    await user.click(within(interviewTask).getByRole("button", { name: "Open Application context" }));
+    expect(screen.getByRole("heading", { name: "Trang Nguyen · Senior Backend Engineer" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "面试流程与状态" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tasks" }));
+    await user.click(screen.getByRole("button", { name: /open trang nguyen assessment draft review/i }));
+    const assessmentTask = screen.getByRole("dialog", { name: /trang nguyen assessment draft review/i });
+    await user.click(within(assessmentTask).getByRole("button", { name: "Mark ready to send" }));
+
+    await user.click(screen.getByRole("button", { name: "Assessments" }));
+    await user.click(screen.getByRole("button", { name: "Sent" }));
+    expect(screen.getAllByText("Ready to Send").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
+    expect(screen.getAllByText("Assessment ready to send").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Task action recorded").length).toBeGreaterThan(0);
+  });
 });
 
 async function login(user: ReturnType<typeof userEvent.setup>) {
