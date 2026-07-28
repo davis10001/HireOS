@@ -351,6 +351,41 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByText("Queued for HR review. Merge waits for A-owned Candidate domain.")).toBeInTheDocument();
   });
 
+  it("shows Founder Inbox as a RecruitingTask-backed decision and risk view", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/founder-inbox");
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Founder Inbox" })).toBeInTheDocument();
+    expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
+    expect(screen.getByText("Founder offer decision risk")).toBeInTheDocument();
+    expect(screen.queryByText("Agency-forwarded duplicate review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Assessment submission follow-up")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /request more evidence for founder final interview approval/i }));
+    expect(screen.getByText(/Completed action: Request More Evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/Completed by: Linh Tran/i)).toBeInTheDocument();
+  });
+
+  it("reflects SLA defaults, L1-L4 automation levels, and AI approval tasks in Settings", async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, "", "/settings");
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Founder decision 48h")).toBeInTheDocument();
+    expect(screen.getByText("Pending approval 24h")).toBeInTheDocument();
+    expect(screen.getByText("Automation Levels")).toBeInTheDocument();
+    expect(screen.getByText("L1")).toBeInTheDocument();
+    expect(screen.getAllByText("L4").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Approve AI candidate merge writeback").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Confirm offer decision writeback").length).toBeGreaterThan(0);
+  });
+
   it("schedules an interview, collects feedback evidence, and reflects next action in Applications", async () => {
     window.history.pushState({}, "", "/applications");
     const user = userEvent.setup();
@@ -422,7 +457,7 @@ describe("Login + Jobs prototype slice", () => {
 
     await user.click(screen.getByRole("button", { name: "Critical" }));
     expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
-    expect(screen.getByText("Source: Applications")).toBeInTheDocument();
+    expect(screen.getAllByText("Source: Applications").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Waiting on Others" }));
     expect(screen.getByText("Assessment submission follow-up")).toBeInTheDocument();
@@ -436,8 +471,8 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(detail).getByText("Evidence refs")).toBeInTheDocument();
     expect(within(detail).getByText("Related objects")).toBeInTheDocument();
 
-    await user.click(within(detail).getByRole("button", { name: "Approve final interview" }));
-    expect(screen.getByText(/Completed action: Approve final interview/i)).toBeInTheDocument();
+    await user.click(within(detail).getByRole("button", { name: "Final Interview" }));
+    expect(screen.getByText(/Completed action: Final Interview/i)).toBeInTheDocument();
     expect(screen.getByText(/Completed by: Linh Tran/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "All Tasks" }));
