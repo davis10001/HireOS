@@ -1942,6 +1942,61 @@ body.modal-open {
   background: transparent;
 }
 
+.interview-ops-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.interview-form,
+.feedback-evidence-panel,
+.interview-status-card,
+.feedback-form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.interview-form,
+.feedback-evidence-panel,
+.interview-status-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.feedback-evidence-panel {
+  margin-bottom: 14px;
+}
+
+.feedback-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feedback-form .wide {
+  grid-column: span 3;
+}
+
+.panel-header.compact {
+  margin-bottom: 0;
+}
+
+.panel-header.compact h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.compact-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence-event-list {
+  margin-top: 2px;
+}
+
 .step-detail-list {
   display: grid;
   gap: 7px;
@@ -2365,8 +2420,14 @@ body.dock-expanded .agent-dock-prompts {
   .content-grid,
   .job-card-grid,
   .metric-grid,
-  .three-grid {
+  .three-grid,
+  .interview-ops-grid,
+  .feedback-form {
     grid-template-columns: 1fr;
+  }
+
+  .feedback-form .wide {
+    grid-column: span 1;
   }
 }
 
@@ -2554,8 +2615,15 @@ body.dock-expanded .agent-dock-prompts {
   .resume-profile,
   .resume-section-grid,
   .question-meta-grid,
-  .question-workspace-grid {
+  .question-workspace-grid,
+  .interview-ops-grid,
+  .feedback-form,
+  .compact-summary {
     grid-template-columns: 1fr;
+  }
+
+  .feedback-form .wide {
+    grid-column: span 1;
   }
 
   .detail-grid,

@@ -1,5 +1,6 @@
 import { Candidate } from "./candidates";
 import { Job } from "./jobs";
+import type { Interview } from "./interviews";
 
 export type ApplicationState =
   | "New Intake"
@@ -24,11 +25,32 @@ export type ApplicationState =
 
 export interface ApplicationTimelineEvent {
   id: string;
-  eventType: "application_created" | "state_changed" | "owner_changed" | "not_fit_current_job";
+  eventType:
+    | "application_created"
+    | "state_changed"
+    | "owner_changed"
+    | "not_fit_current_job"
+    | "interview_scheduled"
+    | "interview_completed"
+    | "evidence_event";
   title: string;
   detail: string;
   actor: string;
   occurredAt: string;
+}
+
+export interface EvidenceEvent {
+  id: string;
+  applicationId: string;
+  eventType: "interview_feedback";
+  sourceType: "Form" | "Email";
+  summary: string;
+  facts: Record<string, unknown>;
+  riskSummary?: string;
+  confidence: number;
+  approvalStatus: "Auto" | "Pending" | "Approved" | "Rejected";
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface Application {
@@ -44,6 +66,8 @@ export interface Application {
   dueAt: string;
   slaStatus: "Ready" | "Today" | "Overdue" | "Blocked";
   timeline: ApplicationTimelineEvent[];
+  evidenceEvents?: EvidenceEvent[];
+  interviews?: Interview[];
 }
 
 export const seedApplications: Application[] = [
