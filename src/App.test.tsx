@@ -220,4 +220,58 @@ describe("Login + Jobs prototype slice", () => {
     await user.click(screen.getByRole("button", { name: "Applications" }));
     expect(screen.getByText(/Ready ·/)).toBeInTheDocument();
   });
+
+  it("schedules an interview, collects feedback evidence, and reflects next action in Applications", async () => {
+    window.history.pushState({}, "", "/applications");
+    const user = userEvent.setup();
+    renderApp();
+
+    await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+    await user.type(screen.getByLabelText(/password/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(screen.getByRole("heading", { name: "Applications" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Interviews" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
+
+    expect(screen.getByRole("heading", { name: "Trang Nguyen · Senior Backend Engineer" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Agent 对话区")).toBeInTheDocument();
+    expect(screen.getByLabelText("Agent 快捷输入")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "面试流程与状态" })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Interview type"), "Technical");
+    await user.clear(screen.getByLabelText("Interviewer"));
+    await user.type(screen.getByLabelText("Interviewer"), "Mai Ho");
+    await user.clear(screen.getByLabelText("Interview time"));
+    await user.type(screen.getByLabelText("Interview time"), "2026-07-29T10:00");
+    await user.clear(screen.getByLabelText("Location or link"));
+    await user.type(screen.getByLabelText("Location or link"), "https://meet.hireos.test/trang-tech");
+    await user.selectOptions(screen.getByLabelText("Candidate confirmation"), "Pending");
+    await user.click(screen.getByRole("button", { name: "Save interview" }));
+
+    expect(screen.getAllByText("Scheduling Interview").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Confirm interview time with Trang Nguyen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Interview scheduling started").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Applications" }));
+    expect(screen.getByText("Confirm interview time with Trang Nguyen")).toBeInTheDocument();
+    expect(screen.getByText(/Today ·/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open application for trang nguyen/i }));
+    await user.click(screen.getByRole("button", { name: "Mark interview completed" }));
+    expect(screen.getAllByText("Waiting Feedback").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Submit interview feedback for Trang Nguyen").length).toBeGreaterThan(0);
+
+    await user.type(screen.getByLabelText("Strengths"), "Architecture tradeoffs, debugging depth, API ownership");
+    await user.type(screen.getByLabelText("Risks"), "Leadership under pressure needs one follow-up.");
+    await user.type(screen.getByLabelText("Scorecard scores"), "Architecture 5, Debugging 4, Ownership 5");
+    await user.type(screen.getByLabelText("Evidence notes"), "Explained API rollback tradeoffs with clear ownership.");
+    await user.type(screen.getByLabelText("Follow-up questions"), "Ask about conflict resolution under release pressure.");
+    await user.click(screen.getByRole("button", { name: "Submit feedback" }));
+
+    expect(screen.getAllByText("Feedback Complete").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Interview feedback parsed").length).toBeGreaterThan(0);
+    expect(screen.getByText("Strong Yes: Architecture tradeoffs, debugging depth, API ownership")).toBeInTheDocument();
+    expect(screen.getByText("Evidence Event")).toBeInTheDocument();
+  });
 });

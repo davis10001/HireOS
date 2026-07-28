@@ -57,6 +57,12 @@ import {
   seedApplications
 } from "./domain/applications";
 import {
+  InterviewDraft,
+  completeInterview,
+  createInterviewForApplication,
+  parseInterviewFeedback
+} from "./domain/interviews";
+import {
   Job,
   JobDraft,
   JobStatus,
@@ -187,6 +193,40 @@ export default function App() {
     setCandidates((current) => current.map((item) => item.id === candidateId ? { ...item, allocationState: "unassigned_pool", currentJobId: null, poolReason: "Duplicate reviewed by HR", updatedAt: new Date().toISOString() } : item));
   }
 
+  function scheduleInterview(applicationId: string, draft: InterviewDraft) {
+    setApplications((current) => current.map((application) => {
+      if (application.id !== applicationId) return application;
+      const result = createInterviewForApplication(application, draft);
+      return { ...result.application, interviews: [...(application.interviews ?? []), result.interview] };
+    }));
+  }
+
+  function markInterviewCompleted(applicationId: string, interviewId: string) {
+    setApplications((current) => current.map((application) => {
+      if (application.id !== applicationId) return application;
+      const interview = application.interviews?.find((item) => item.id === interviewId);
+      if (!interview) return application;
+      const result = completeInterview(application, interview);
+      return {
+        ...result.application,
+        interviews: (application.interviews ?? []).map((item) => item.id === interviewId ? result.interview : item)
+      };
+    }));
+  }
+
+  function submitInterviewFeedback(applicationId: string, interviewId: string, draft: Parameters<typeof parseInterviewFeedback>[2]) {
+    setApplications((current) => current.map((application) => {
+      if (application.id !== applicationId) return application;
+      const interview = application.interviews?.find((item) => item.id === interviewId);
+      if (!interview) return application;
+      const result = parseInterviewFeedback(application, interview, draft);
+      return {
+        ...result.application,
+        interviews: (application.interviews ?? []).map((item) => item.id === interviewId ? result.interview : item)
+      };
+    }));
+  }
+
   if (!session) {
     return (
       <LoginPage
@@ -247,7 +287,7 @@ export default function App() {
       ) : null}
       {route === "candidates" ? <CandidatesPage applications={applications} candidates={candidates} jobs={jobs} onCreateCandidate={createCandidate} onResolveDuplicate={resolveDuplicateCandidate} /> : null}
       {route === "applications" ? <ApplicationsPage applications={applications} onOpenApplication={(applicationId) => navigate("application-detail", applicationId)} /> : null}
-      {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} candidate={selectedApplicationCandidate} /> : null}
+      {route === "application-detail" ? <ApplicationDetailPage application={selectedApplication} candidate={selectedApplicationCandidate} onCompleteInterview={markInterviewCompleted} onScheduleInterview={scheduleInterview} onSubmitFeedback={submitInterviewFeedback} /> : null}
       {isPlaceholderRoute(route) && route !== "application-detail" && route !== "applications" && route !== "candidates" ? <PlaceholderPage route={route} title={placeholderLabels[route]} /> : null}
     </AppShell>
   );
@@ -824,14 +864,65 @@ function ApplicationsPage({ applications, onOpenApplication }: { applications: A
   );
 }
 
-function ApplicationDetailPage({ application, candidate }: { application?: Application; candidate?: Candidate }) {
+function ApplicationDetailPage({
+  application,
+  candidate,
+  onCompleteInterview,
+  onScheduleInterview,
+  onSubmitFeedback
+}: {
+  application?: Application;
+  candidate?: Candidate;
+  onCompleteInterview: (applicationId: string, interviewId: string) => void;
+  onScheduleInterview: (applicationId: string, draft: InterviewDraft) => void;
+  onSubmitFeedback: (applicationId: string, interviewId: string, draft: Parameters<typeof parseInterviewFeedback>[2]) => void;
+}) {
   const [activeTab, setActiveTab] = useState<"basic" | "interview" | "questions">("interview");
+  const [interviewDraft, setInterviewDraft] = useState<InterviewDraft>({
+    candidateConfirmationStatus: "Confirmed",
+    interviewer: "Mai Ho",
+    interviewType: "Technical",
+    locationOrLink: "https://meet.hireos.test/trang-tech",
+    scheduledStartAt: "2026-07-29T03:00:00.000Z"
+  });
+  const [feedbackDraft, setFeedbackDraft] = useState({
+    evidenceNotes: "",
+    followUpQuestions: "",
+    risks: "",
+    scorecardScores: "",
+    strengths: ""
+  });
   const candidateName = candidate?.fullName ?? application?.candidateName ?? "Trang Nguyen";
   const jobTitle = application?.jobTitle ?? "高级后端工程师";
   const currentState = application?.currentState ?? "Founder Review";
   const currentOwner = application?.currentOwner ?? "Founder";
   const nextAction = application?.nextAction ?? "批准终面";
   const dueAt = application?.dueAt ? new Date(application.dueAt).toLocaleDateString("en-CA") : "今天到期";
+  const activeInterview = application?.interviews?.find((interview) => interview.status !== "Cancelled" && interview.status !== "No Show") ?? application?.interviews?.[0];
+
+  function updateInterviewDraft<K extends keyof InterviewDraft>(key: K, value: InterviewDraft[K]) {
+    setInterviewDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function submitInterviewSchedule(event: FormEvent) {
+    event.preventDefault();
+    if (!application) return;
+    onScheduleInterview(application.id, interviewDraft);
+  }
+
+  function submitFeedback(event: FormEvent) {
+    event.preventDefault();
+    if (!application || !activeInterview) return;
+    onSubmitFeedback(application.id, activeInterview.id, {
+      evidenceNotes: feedbackDraft.evidenceNotes,
+      followUpQuestions: feedbackDraft.followUpQuestions.split(/\n|;/).map((item) => item.trim()).filter(Boolean),
+      recommendation: "Strong Yes",
+      risks: feedbackDraft.risks,
+      scorecardScores: parseScorecardScores(feedbackDraft.scorecardScores),
+      sourceType: "Form",
+      strengths: feedbackDraft.strengths
+    });
+  }
 
   return (
     <>
@@ -871,6 +962,46 @@ function ApplicationDetailPage({ application, candidate }: { application?: Appli
         </section>
         <section className={`panel interview-panel ${activeTab === "interview" ? "" : "is-hidden"}`} data-application-detail-panel="interview">
           <div className="panel-header"><div><h2>面试流程与状态</h2><p>当前申请在该岗位下的阶段、负责人、下一步、SLA、AI 准备状态和证据缺口</p></div></div>
+          <section className="interview-ops-grid" aria-label="Interview workflow controls">
+            <form className="interview-form" onSubmit={submitInterviewSchedule}>
+              <div className="panel-header compact"><div><h3>Schedule in Application Detail</h3><p>安排面试不离开当前 Application drill-down。</p></div></div>
+              <label className="form-field"><span>Interview type</span><select aria-label="Interview type" value={interviewDraft.interviewType} onChange={(event) => updateInterviewDraft("interviewType", event.target.value as InterviewDraft["interviewType"])}><option>HR Screen</option><option>Technical</option><option>Product</option><option>Founder</option><option>Final</option></select></label>
+              <FormInput label="Interviewer" value={interviewDraft.interviewer} onChange={(value) => updateInterviewDraft("interviewer", value)} />
+              <label className="form-field"><span>Interview time</span><input aria-label="Interview time" type="datetime-local" value={toDateTimeLocalValue(interviewDraft.scheduledStartAt)} onChange={(event) => {
+                const nextIso = parseDateTimeLocalValue(event.target.value);
+                if (nextIso) updateInterviewDraft("scheduledStartAt", nextIso);
+              }} /></label>
+              <FormInput label="Location or link" value={interviewDraft.locationOrLink} onChange={(value) => updateInterviewDraft("locationOrLink", value)} />
+              <label className="form-field"><span>Candidate confirmation</span><select aria-label="Candidate confirmation" value={interviewDraft.candidateConfirmationStatus} onChange={(event) => updateInterviewDraft("candidateConfirmationStatus", event.target.value as InterviewDraft["candidateConfirmationStatus"])}><option>Pending</option><option>Confirmed</option><option>Declined</option></select></label>
+              <button className="primary-button" type="submit"><CalendarClock aria-hidden="true" /> Save interview</button>
+            </form>
+            <section className="interview-status-card">
+              <div className="panel-header compact"><div><h3>Current Interview</h3><p>状态和反馈 SLA 回写到 Application。</p></div></div>
+              <div className="applicant-summary compact-summary"><div><span>Application State</span><strong>{currentState}</strong></div><div><span>Next Action</span><strong>{nextAction}</strong></div><div><span>SLA</span><strong>{application?.slaStatus ?? "Ready"} · {dueAt}</strong></div></div>
+              {activeInterview ? (
+                <div className="cards">
+                  <div className="work-card ai"><div className="card-top"><div className="card-copy"><strong>{activeInterview.status}</strong><span>{activeInterview.interviewType} · {activeInterview.interviewer} · {activeInterview.locationOrLink}</span></div><span className={`pill ${activeInterview.status === "Feedback Complete" ? "green" : activeInterview.status === "Feedback Pending" ? "danger" : "warn"}`}>{activeInterview.candidateConfirmationStatus}</span></div></div>
+                  <button className="ghost-button" disabled={activeInterview.status === "Feedback Pending" || activeInterview.status === "Feedback Complete"} type="button" onClick={() => application ? onCompleteInterview(application.id, activeInterview.id) : undefined}>Mark interview completed</button>
+                </div>
+              ) : <div className="empty-state">No Interview created yet for this Application.</div>}
+            </section>
+          </section>
+          <section className="feedback-evidence-panel" aria-label="Interview feedback evidence">
+            <div className="panel-header compact"><div><h3>Feedback to Evidence Event</h3><p>表单或邮件反馈必须结构化为推荐、评分、证据、风险和追问。</p></div></div>
+            <form className="feedback-form" onSubmit={submitFeedback}>
+              <FormInput label="Strengths" value={feedbackDraft.strengths} onChange={(value) => setFeedbackDraft((current) => ({ ...current, strengths: value }))} />
+              <FormInput label="Risks" value={feedbackDraft.risks} onChange={(value) => setFeedbackDraft((current) => ({ ...current, risks: value }))} />
+              <FormInput label="Scorecard scores" value={feedbackDraft.scorecardScores} onChange={(value) => setFeedbackDraft((current) => ({ ...current, scorecardScores: value }))} />
+              <label className="form-field wide"><span>Evidence notes</span><textarea aria-label="Evidence notes" rows={3} value={feedbackDraft.evidenceNotes} onChange={(event) => setFeedbackDraft((current) => ({ ...current, evidenceNotes: event.target.value }))} /></label>
+              <label className="form-field wide"><span>Follow-up questions</span><textarea aria-label="Follow-up questions" rows={3} value={feedbackDraft.followUpQuestions} onChange={(event) => setFeedbackDraft((current) => ({ ...current, followUpQuestions: event.target.value }))} /></label>
+              <button className="primary-button" disabled={!activeInterview} type="submit"><BadgeCheck aria-hidden="true" /> Submit feedback</button>
+            </form>
+            <div className="cards evidence-event-list">
+              {(application?.evidenceEvents ?? []).map((event) => (
+                <div className="work-card" key={event.id}><div className="card-top"><div className="card-copy"><strong>{event.summary}</strong><span>{event.riskSummary} · Source: {event.sourceType}</span></div><span className="pill green">Evidence Event</span></div></div>
+              ))}
+            </div>
+          </section>
           <div className="application-timeline">
             <ApplicationStep done icon={<Check />} title="HR 审核" subtitle="基础条件、薪资范围和英语协作已确认" status="已完成" owner="Linh Tran" next="无" sla="完成" ai="摘要已生成 · 追问已记录" evidence="地点、薪资、Notice period、英语协作" />
             <ApplicationStep done icon={<Check />} title="技术面试" subtitle="系统设计、调试思路和 API 质量已验证" status="已完成" owner="Tech Lead" next="补充记录" sla="完成" ai="记录已摘要 · 评分待面试官确认" evidence="架构取舍、调试深度、API ownership" focus="证据强度高；缺少的是领导力场景，而不是技术深度。" />
@@ -1001,6 +1132,26 @@ function candidateInitials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "C";
 }
 
+function toDateTimeLocalValue(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 16);
+}
+
+function parseDateTimeLocalValue(value: string): string | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function parseScorecardScores(value: string): Record<string, number> {
+  return value.split(",").reduce<Record<string, number>>((scores, segment) => {
+    const match = segment.trim().match(/^(.+?)\s+(\d+)$/);
+    if (!match) return scores;
+    scores[match[1].trim().toLowerCase().replace(/\s+/g, "_")] = Number(match[2]);
+    return scores;
+  }, {});
+}
+
 function loadJobs(): Job[] {
   return loadLocalState(JOBS_KEY, seedJobs);
 }
@@ -1064,7 +1215,8 @@ function routeToPath(route: RouteId, jobId?: string): string {
 }
 
 function shellActiveRoute(route: RouteId): ShellNavRoute {
-  if (route === "job-detail" || route === "application-detail") return "jobs";
+  if (route === "job-detail") return "jobs";
+  if (route === "application-detail") return "applications";
   if (route === "inbox-detail" || route === "email-agent") return "inbox";
   if (route === "settings-mailbox") return "settings";
   if (route === "analytics") return "analytics";
