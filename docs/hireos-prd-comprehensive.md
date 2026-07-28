@@ -9,16 +9,17 @@
 
 ### 1.1 产品定位
 
-HireOS 是面向 Founder、HR、Hiring Manager 与 Interviewer 的 Email-first AI 原生端到端招聘操作系统。
+HireOS 是面向 Founder、HR、Hiring Manager 与 Interviewer 的 Task-first AI 原生端到端招聘操作系统。
 
-它以招聘邮箱为 MVP 的核心数据入口，通过 AI 读取邮件线程、CV 附件、候选人回复、面试安排、面试反馈和 Assessment 提交，将分散在邮箱与人工记忆里的招聘信息结构化为 Candidate、Job、Application、Evidence Event、Assessment、Decision 和 Analytics。
+它以招聘邮箱为 MVP 的核心数据入口，通过 AI 读取邮件线程、CV 附件、候选人回复、面试安排、面试反馈和 Assessment 提交，将分散在邮箱与人工记忆里的招聘信息结构化为 Candidate、Job、Application、Evidence Event、Assessment、Decision、Task 和 Analytics。
 
-HireOS 的核心目标不是“筛简历”，而是把招聘流程变成一个可追踪、可判断、可推进、可度量的运营系统。
+HireOS 的核心目标不是“筛简历”，而是把招聘流程变成一个以 Task 为执行入口、以 Application 为业务流程、以 Evidence 为判断依据的可追踪、可判断、可推进、可度量的运营系统。
 
 ### 1.2 产品核心承诺
 
 - 每个候选人针对每个岗位的招聘进展都有明确状态。
 - 每个活跃 Application 都必须有负责人、下一步和截止时间。
+- 每个需要人或 AI 继续推进的招聘事项都必须形成 Task，并出现在 Tasks、Dashboard 摘要或角色化任务视图中。
 - 每次状态变化、推荐、决策都能回到原始邮件、附件、面试反馈或人工记录。
 - AI 可以提取、推荐、总结、起草和低风险写入，但不能自动拒绝、录用或做 Offer Decision。
 - Founder 只处理高价值决策，不被日常招聘运营噪音淹没。
@@ -34,11 +35,13 @@ MVP 成立的最低闭环：
 4. 高置信度邮件自动创建或更新 Candidate / Application。
 5. 低置信度邮件进入 Inbox 由 HR 审核。
 6. Application 自动拥有 Current State、Current Owner、Process Owner、Next Action、Due Date。
-7. 面试安排、反馈、Assessment 提交能进入 Application Timeline。
-8. AI 能生成带证据引用的 Founder Decision Card。
-9. Founder 能做 Continue、Request More Evidence、Final Interview、Reject、Offer Decision。
-10. Blocked 页面能显示逾期、无人负责、证据缺口、等待候选人或等待面试官导致的阻塞。
-11. Analytics 能展示招聘漏斗、渠道质量、执行效率和 AI 采纳。
+7. Tasks 能展示来自 Application、Inbox、Interview、Assessment、Blocked、Settings 的待办、审批、风险和下一步。
+8. Dashboard 能汇总今日 Critical、Today Due、Waiting、Upcoming Interviews 和 Recruitment Health，并跳转到 Tasks 过滤视图。
+9. 面试安排、反馈、Assessment 提交能进入 Application Timeline 并生成对应 Task。
+10. AI 能生成带证据引用的 Founder Decision Task / Card。
+11. Founder 能在 Founder Inbox 处理 Continue、Request More Evidence、Final Interview、Reject、Offer Decision。
+12. Blocked 页面能显示逾期、无人负责、证据缺口、等待候选人或等待面试官导致的阻塞，并生成可处理 Task。
+13. Analytics 能展示招聘漏斗、渠道质量、执行效率、Task aging 和 AI 采纳。
 
 ## 2. 用户、角色与权限
 
@@ -92,6 +95,7 @@ MVP 成立的最低闭环：
 ### 3.1 MVP 范围内
 
 - Dashboard。
+- Tasks。
 - Jobs。
 - Job Detail。
 - Inbox。
@@ -138,16 +142,22 @@ MVP 成立的最低闭环：
 ```text
 HireOS
 ├── Dashboard
+├── Tasks
+│   ├── All Tasks
+│   ├── My Tasks
+│   ├── Critical
+│   ├── Today
+│   ├── Waiting on Others
+│   ├── Batch Review
+│   └── Task Detail
 ├── Jobs
 │   ├── Job List
 │   ├── Job Create Wizard
 │   └── Job Detail
 ├── Inbox
-│   ├── Unified Queue
 │   ├── Email Intake Queue
-│   ├── Founder Decisions
-│   ├── Assessment Review
-│   ├── Blocked Queue
+│   ├── AI Action Review
+│   ├── Candidate Duplicate Review
 │   └── Inbox Detail
 ├── Email Agent
 ├── Applications
@@ -399,7 +409,7 @@ Workflow Stage 字段：
 | next_action | string | 是 | 下一步 |
 | due_at | datetime | 是 | 截止时间 |
 | sla_status | enum | 是 | On Track / Due Soon / Overdue / Missing |
-| priority | enum | 是 | Low / Normal / High / Urgent |
+| priority | enum | 是 | Critical / High / Normal / Low |
 | risk_level | enum | 是 | None / Low / Medium / High |
 | evidence_coverage | number | 否 | Scorecard 证据覆盖率 |
 | last_activity_at | datetime | 是 | 最近活动 |
@@ -466,7 +476,41 @@ Workflow Stage 字段：
 | created_by | string | 是 | 创建者 |
 | created_at | datetime | 是 | 创建时间 |
 
-### 6.13 Inbox Item
+### 6.13 Task
+
+Task 是 HireOS 的执行入口，表示一个需要人、AI 或流程规则继续推进的招聘事项。Task 不替代 Candidate、Job、Application、Interview、Assessment、Decision 等业务对象，而是引用它们并承载 Owner、Priority、Status、Next Action、Due Date、SLA、证据、风险、审批动作和审计。
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---:|---|
+| id | string | 是 | Task ID |
+| org_id | string | 是 | 组织 |
+| type | enum | 是 | Job Setup / Candidate Review / Application Next Action / Inbox Review / Interview Scheduling / Interview Feedback / Assessment Review / Founder Decision / Blocked Resolution / AI Action Approval / Settings Alert |
+| title | string | 是 | 任务标题 |
+| description | text | 否 | 任务说明 |
+| source_module | enum | 是 | Dashboard / Jobs / Candidates / Applications / Inbox / Interview / Assessment / Founder Inbox / Blocked / Settings / System |
+| current_owner_id | string | 否 | 当前负责人 |
+| owner_role | enum | 是 | Founder / HR Admin / HR Member / Hiring Manager / Interviewer / AI |
+| priority | enum | 是 | Critical / High / Normal / Low |
+| status | enum | 是 | New / In Progress / Waiting / Ready for Review / Completed / Blocked / Overdue / Cancelled |
+| next_action | string | 是 | 下一步动作 |
+| due_at | datetime | 否 | 截止时间 |
+| sla_status | enum | 是 | Ready / Today / Due Soon / Overdue / Missing / Waiting |
+| related_candidate_id | string | 否 | 关联 Candidate |
+| related_job_id | string | 否 | 关联 Job |
+| related_application_id | string | 否 | 关联 Application |
+| related_inbox_item_id | string | 否 | 关联 Inbox Item |
+| related_ai_action_id | string | 否 | 关联 AI Action |
+| evidence_refs | array | 否 | 证据引用 |
+| ai_recommendation | json | 否 | AI 建议 |
+| risk_summary | text | 否 | 风险摘要 |
+| allowed_actions | array | 是 | 当前可执行动作 |
+| completed_action | string | 否 | 完成时采取的动作 |
+| completed_by | string | 否 | 完成人 |
+| completed_at | datetime | 否 | 完成时间 |
+| created_at | datetime | 是 | 创建时间 |
+| updated_at | datetime | 是 | 更新时间 |
+
+### 6.14 Inbox Item
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
@@ -475,7 +519,7 @@ Workflow Stage 字段：
 | type | enum | 是 | 待办类型 |
 | title | string | 是 | 标题 |
 | description | text | 否 | 描述 |
-| priority | enum | 是 | Low / Normal / High / Urgent |
+| priority | enum | 是 | Critical / High / Normal / Low |
 | status | enum | 是 | Open / In Review / Approved / Applied / Rejected / Snoozed / Escalated / Closed |
 | owner_id | string | 否 | 负责人 |
 | due_at | datetime | 否 | 截止时间 |
@@ -1059,7 +1103,7 @@ Applied -> Reverted
 
 ### 8.1 Dashboard
 
-目标：展示招聘系统健康度，让 Founder 与 HR 快速识别需要处理的事项。
+目标：作为 Daily Home 展示招聘系统健康度和今日任务摘要，让 Founder 与 HR 快速识别需要处理的事项，并跳转到 Tasks 的对应过滤视图。
 
 核心场景：
 
@@ -1072,10 +1116,11 @@ Applied -> Reverted
 
 - 展示招聘漏斗：CV、HR Review、Shortlist、Interview、Assessment、Founder Review、Offer Decision。
 - 展示 Job Progress：按 Job 展示活跃 Application 数、阶段分布、Blocked 数。
-- 展示 Pending：待 HR 审核、待 Founder 决策、待 Assessment Review、待反馈。
+- 展示 Task Summary：Critical、Today Due、Waiting on Others、Upcoming Interviews、Batch Review。
 - 展示 Evidence Timeline：最近关键证据事件。
 - 展示 Recommended Next Move：AI 推荐下一步。
-- 支持点击进入 Jobs、Inbox、Application Detail、Founder Inbox、Blocked。
+- 支持点击进入 Tasks、Jobs、Inbox、Application Detail、Founder Inbox、Blocked。
+- Dashboard 不承载完整任务列表、批量处理和复杂筛选；这些能力属于 Tasks 模块。
 
 页面状态：
 
@@ -1089,10 +1134,53 @@ Applied -> Reverted
 验收标准：
 
 - 用户能在 30 秒内看到今日最紧急事项。
-- 每个可点击指标都能进入对应列表且筛选条件正确。
+- 每个可点击任务摘要都能进入 Tasks 或对应模块，且筛选条件正确。
 - Dashboard 指标与 Analytics 口径一致。
 
-### 8.2 Jobs
+### 8.2 Tasks
+
+目标：提供独立的任务中心，让 Founder、HR、Hiring Manager、Interviewer 能从任务角度处理所有招聘待办、审批、风险和下一步。
+
+核心场景：
+
+- HR 打开 Tasks 查看自己今天必须推进的候选人、面试反馈、Assessment Review 和 Blocked Resolution。
+- Founder 打开 Tasks 或 Founder Inbox 只处理高价值决策和风险升级。
+- HR Admin 查看 Settings Alert、SLA 缺失、AI Action Approval 和邮箱异常。
+- 面试官只看分配给自己的 Interview Feedback Task。
+
+功能需求：
+
+- 左侧 Sidebar 独立入口：Tasks / 任务。
+- All Tasks：全部任务列表。
+- My Tasks：当前用户负责的任务。
+- Critical：最高优先级任务。
+- Today：今天到期任务。
+- Waiting on Others：等待 HR、Founder、Interviewer、Candidate 或 AI 的任务。
+- Batch Review：可批量处理的审核类任务。
+- 按 Owner、Owner Role、Priority、Status、SLA、Source Module、Job、Candidate、Application 筛选。
+- 展示 Task title、source module、related object、priority、status、owner、next action、due date、SLA、risk、AI recommendation。
+- 支持打开 Task Detail。
+- 支持在 Task 卡片或详情内执行 allowed actions。
+- 执行动作后写入 Task completion、Timeline、Audit Log，并按规则生成下一步 Task。
+
+业务规则：
+
+- Task 是执行入口，不替代 Application 状态机。
+- Founder Inbox 是 Founder 决策任务视图，本质上消费 Task，不独立创造另一套任务模型。
+- Inbox Item 可以生成或关联 Task，但 Inbox 不等于 Tasks。
+- 活跃 Application 缺 Owner、Next Action 或 Due Date 时必须生成 Task，并可能进入 Blocked。
+- Critical / High / Normal / Low 是统一优先级词汇，不再使用 Urgent。
+- AI Action 的敏感写回必须进入 AI Action Approval Task。
+
+验收标准：
+
+- 用户能从 Sidebar 进入 Tasks。
+- 用户能在 Tasks 中看到来自 Applications、Inbox、Interview、Assessment、Blocked、Settings 的任务。
+- 用户能按 Owner、Priority、Status、SLA 和 Source Module 筛选。
+- 用户完成一个 Task 后，相关 Application / Timeline / Audit 状态同步更新。
+- Founder 只看到自己需要处理的 Founder Decision / Risk Escalation 类任务。
+
+### 8.3 Jobs
 
 目标：管理岗位、岗位标准和岗位级招聘流程。
 
@@ -1136,7 +1224,7 @@ Applied -> Reverted
 - 用户能发布满足条件的 Active Job。
 - 不满足条件的 Job 发布时必须显示缺失项。
 
-### 8.3 Job Detail
+### 8.4 Job Detail
 
 目标：展示和编辑单个岗位的招聘标准、流程、候选人和邮件匹配规则。
 
@@ -1179,22 +1267,22 @@ Applied -> Reverted
 - Candidate 标记为 Not Fit Current Job 时，不应删除 Candidate；可保留到公共池、推荐其它岗位，或在明确原因下全局拒绝。
 - 疑似重复 Candidate 必须先进入 Duplicate Review，人工确认前不能绑定岗位创建 Application。
 
-### 8.4 Inbox
+### 8.5 Inbox
 
-目标：统一承载所有需要人工处理的招聘工作项。
+目标：处理邮件摄取、低置信度解析、候选人去重、AI Action 写回预览等来自邮箱和 AI 解析边界的审核工作。
 
 核心场景：
 
 - HR 审核低置信度邮件匹配。
-- HR 批准 AI 推荐状态更新。
+- HR 批准来自邮件或 AI 解析的推荐状态更新。
 - HR 处理候选人重复。
-- Founder 处理决策卡。
-- HR 处理 Blocked。
+- HR 将 Inbox 审核结果写入 Candidate、Application、Evidence Event 或 Task。
 
 功能需求：
 
-- 统一工作队列。
-- 二级业务队列。
+- Email Intake Queue。
+- AI Action Review。
+- Candidate Duplicate Review。
 - 按类型、优先级、负责人、状态筛选。
 - 展示已连接邮箱。
 - 展示 Highest-risk item。
@@ -1220,8 +1308,10 @@ Applied -> Reverted
 - 需要人处理的 Inbox Item 必须有 owner 或 owner role。
 - 审核通过后必须产生 Applied 结果或明确无写回。
 - 驳回必须记录原因。
+- Inbox Item 若需要人继续处理，必须关联或生成 Task。
+- Founder 决策、Blocked 处理、Assessment Review 可以从 Inbox 产生，但主执行视图应进入 Tasks 或对应业务模块。
 
-### 8.5 Inbox Detail
+### 8.6 Inbox Detail
 
 目标：在人工审批前展示原始证据、AI 解析、写回预览和审核清单。
 
@@ -1249,7 +1339,7 @@ Applied -> Reverted
 - 用户修改 AI 输出后，修改版本也要进入 Audit Log。
 - Do not auto-apply 类型只能人工处理。
 
-### 8.6 Email Agent
+### 8.7 Email Agent
 
 目标：把招聘邮件转化成候选人、流程和证据。
 
@@ -1279,7 +1369,7 @@ Applied -> Reverted
 - 低置信度匹配不得静默创建 Application。
 - Auto Applied 仅限安全动作。
 
-### 8.7 Applications
+### 8.8 Applications
 
 目标：作为招聘流程主工作台，管理候选人对岗位的完整流程。
 
@@ -1308,7 +1398,7 @@ Applied -> Reverted
 - 用户可批量调整 Owner 和 Due Date。
 - 任何状态更新都写入 Timeline。
 
-### 8.8 Application Detail
+### 8.9 Application Detail
 
 目标：围绕单个 Application 展示所有决策上下文。
 
@@ -1338,7 +1428,7 @@ Applied -> Reverted
 - Application Detail 必须展示 Evidence 与原始来源链接。
 - Founder 决策必须基于当前 Application，不影响候选人其他岗位流程。
 
-### 8.9 Candidates
+### 8.10 Candidates
 
 目标：从“人”的角度维护可复用候选人档案、分配状态、CV 历史和跨岗位历史。
 
@@ -1382,7 +1472,7 @@ Applied -> Reverted
 - 合并 Candidate 时保留所有 Email Thread、CV、Source、Application。
 - 合并操作必须人工确认和审计。
 
-### 8.10 Assessments
+### 8.11 Assessments
 
 目标：用 Assessment 补齐证据缺口，辅助决策，而不是增加无效流程。
 
@@ -1417,15 +1507,16 @@ Applied -> Reverted
 - AI Review 只能作为建议，最终校准由人完成。
 - Stop Rule 可以建议跳过额外 Assessment，但需人确认。
 
-### 8.11 Founder Inbox
+### 8.12 Founder Inbox
 
-目标：集中处理 Founder 的高价值招聘决策。
+目标：集中处理 Founder 的高价值招聘决策任务。Founder Inbox 是 Tasks 的角色化决策视图，只展示需要 Founder 判断、审批或承担风险的 Task。
 
 核心场景：
 
 - Founder 每天只看真正需要自己处理的候选人。
 - Founder 对证据完整候选人做终面或 Offer Decision。
 - Founder 对证据不足候选人要求补证据。
+- Founder 处理高价值候选人流失、Offer Decision、Final Interview、Reject、Request More Evidence 等 Critical / High Task。
 
 功能需求：
 
@@ -1434,6 +1525,7 @@ Applied -> Reverted
 - Evidence Ready 指标。
 - Risk Escalations 指标。
 - Decision Cards。
+- Founder Decision Tasks。
 - Decision Anatomy。
 - Evidence / Risk / Confidence。
 - Approve / Open Card / Request Evidence / Reject / Offer Decision。
@@ -1441,11 +1533,12 @@ Applied -> Reverted
 业务规则：
 
 - Founder Inbox 不显示普通 HR 操作噪音。
+- Founder Inbox 不维护独立任务模型，所有卡片必须映射到 Task。
 - AI 推荐必须说明证据、风险和置信度。
 - Reject、Final Interview、Offer Decision 必须人工确认。
 - Founder 决策必须写入 Decision Record 和 Timeline。
 
-### 8.12 Blocked
+### 8.13 Blocked
 
 目标：让卡住的招聘流程可见、可归因、可处理。
 
@@ -1484,7 +1577,7 @@ Applied -> Reverted
 - 解除 Blocked 后回到 previous_state 或用户选择的新状态。
 - 高风险 Blocked 可升级给 Founder 或 HR Admin。
 
-### 8.13 Analytics
+### 8.14 Analytics
 
 目标：衡量招聘进展、运营效率、渠道质量和 AI 采纳。
 
@@ -1530,7 +1623,7 @@ Applied -> Reverted
 - 每个指标需要定义口径。
 - 数据不足时必须显示原因。
 
-### 8.14 Settings
+### 8.15 Settings
 
 目标：管理工作区、邮箱、权限、SLA、AI 自动化、模板和证据策略。
 
@@ -1559,7 +1652,7 @@ Applied -> Reverted
 - AI 自动写入策略必须按动作类型配置。
 - 默认 SLA 修改不应自动覆盖已有 Application，除非用户确认。
 
-### 8.15 Mailbox Settings
+### 8.16 Mailbox Settings
 
 目标：把邮箱配置变成明确的生产规则。
 
@@ -1940,9 +2033,10 @@ AI 禁止执行：
 ### 15.1 功能验收
 
 - Dashboard 能展示真实数据指标。
+- Tasks 能展示跨模块任务，并支持 My Tasks、Critical、Today、Waiting、Batch Review 视图。
 - Jobs 能创建、发布、暂停、关闭岗位。
 - Job Detail 能查看岗位配置和候选人列表。
-- Inbox 能展示所有待审核项。
+- Inbox 能展示邮件摄取、低置信度解析、重复候选人和 AI Action Review 等审核项。
 - Inbox Detail 能完成审批、修改、驳回。
 - Email Agent 能同步和解析至少一种邮箱。
 - Applications 能展示真实流程状态。
@@ -1957,6 +2051,8 @@ AI 禁止执行：
 ### 15.2 数据验收
 
 - 活跃 Application 必须有 owner、next action、due date。
+- 需要人处理的招聘事项必须有 Task。
+- Task 必须有关联来源、Owner 或 Owner Role、Priority、Status、Next Action、SLA。
 - 每个状态变化必须有 Timeline。
 - 每个 AI 写入必须有 AI Action。
 - 每个关键判断必须能追溯 Evidence Event。
@@ -1970,6 +2066,7 @@ AI 禁止执行：
 - AI 不自动拒绝、录用或做 Offer Decision。
 - 人工可修改、批准、拒绝、撤销 AI 输出。
 - 低置信度结果进入 Inbox。
+- 敏感 AI Action 进入 AI Action Approval Task。
 
 ## 16. 开发拆分建议
 
@@ -1983,17 +2080,28 @@ AI 禁止执行：
 ### Epic 2：核心招聘数据模型
 
 - Organization / User / Job / Candidate / Application。
+- Task。
 - Evidence Event / Timeline / Decision。
 - Audit Log。
 
-### Epic 3：Application Workflow
+### Epic 3：Task Core / Task Center
+
+- Task 状态机。
+- Priority / Owner / Owner Role。
+- Due Date / SLA Status。
+- Task Detail。
+- My Tasks / Critical / Today / Waiting / Batch Review。
+- Task completion 与下一步 Task 生成。
+
+### Epic 4：Application Workflow
 
 - Application 状态机。
 - Owner / Next Action / SLA。
 - Blocked 自动识别。
 - 状态变更审计。
+- Application Task 生成规则。
 
-### Epic 4：Mailbox Intake
+### Epic 5：Mailbox Intake
 
 - 邮箱连接。
 - 邮件同步。
@@ -2001,41 +2109,46 @@ AI 禁止执行：
 - Email Thread 分类。
 - Candidate / Job / Application 匹配。
 
-### Epic 5：Review Inbox
+### Epic 6：Review Inbox
 
 - Inbox Item。
 - 审核详情。
 - 写回预览。
 - Approve / Modify / Reject / Escalate。
+- Inbox Item 到 Task 的关联。
 
-### Epic 6：AI Governance
+### Epic 7：AI Governance
 
 - AI Action。
 - 置信度和证据引用。
 - 自动写入边界。
 - 审批规则。
+- L1 Suggest / L2 Draft / L3 Execute / L4 Execute + Escalate。
 - 撤销和纠错。
 
-### Epic 7：Founder Decision
+### Epic 8：Founder Decision
 
 - Decision Card。
 - Founder Inbox。
 - Decision Record。
 - Offer Decision。
+- Founder Decision Task。
 
-### Epic 8：Assessment Workspace
+### Epic 9：Assessment Workspace
 
 - Assessment。
 - Submission。
 - Rubric。
 - AI Review。
 - Stop Rule。
+- Assessment Task 生成规则。
 
-### Epic 9：Analytics
+### Epic 10：Analytics
 
 - 事件埋点。
 - 指标口径。
 - Dashboard 与 Analytics 数据源。
+- Task aging 与任务吞吐。
 - 渠道质量和 AI 采纳。
 
 ## 17. 当前原型到实现的说明
@@ -2044,9 +2157,10 @@ AI 禁止执行：
 
 - 左侧主导航。
 - 右侧 Agent 工作区。
-- Dashboard 的漏斗和推荐动作。
+- Dashboard 的漏斗、今日任务摘要和推荐动作。
+- Tasks 的独立栏目和跨模块任务视角。
 - Jobs 的筛选和新建岗位向导。
-- Inbox 的统一队列与邮箱连接向导。
+- Inbox 的邮件审核队列与邮箱连接向导。
 - Applications 的 State / Owner / Next Action / SLA 表格结构。
 - Application Detail 的候选人 + 岗位 + 流程分离。
 - Founder Inbox 的 Decision Card。
