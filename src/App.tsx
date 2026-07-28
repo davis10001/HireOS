@@ -4,7 +4,6 @@ import {
   Archive,
   ArrowLeft,
   BadgeCheck,
-  Bell,
   BriefcaseBusiness,
   CalendarClock,
   ChartNoAxesCombined,
@@ -29,7 +28,6 @@ import {
   Settings,
   Sparkles,
   TriangleAlert,
-  UserRound,
   UsersRound,
   X
 } from "lucide-react";
@@ -336,6 +334,13 @@ function AppShell({
   const [agentCollapsed, setAgentCollapsed] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
+  const [language, setLanguage] = useState<"EN" | "中文">(() => {
+    try {
+      return window.localStorage.getItem("hireos.language") === "中文" ? "中文" : "EN";
+    } catch {
+      return "EN";
+    }
+  });
 
   useEffect(() => {
     document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
@@ -345,6 +350,11 @@ function AppShell({
       document.body.classList.remove("sidebar-collapsed", "agent-collapsed", "dock-expanded");
     };
   }, [sidebarCollapsed, agentCollapsed, dockOpen]);
+
+  function chooseLanguage(nextLanguage: "EN" | "中文") {
+    setLanguage(nextLanguage);
+    window.localStorage.setItem("hireos.language", nextLanguage);
+  }
 
   return (
     <div className="app-shell">
@@ -371,18 +381,44 @@ function AppShell({
           <NavButton active={activeRoute === "settings"} icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
         </nav>
         <div className="sidebar-footer">
-          <div className="user-status" aria-expanded={accountOpen} role="button" tabIndex={0}>
+          <div
+            aria-expanded={accountOpen}
+            aria-label={`User menu for ${session.name}`}
+            className="user-status"
+            onClick={() => setAccountOpen((value) => !value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setAccountOpen((value) => !value);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
             <div className="avatar">LT</div>
             <div className="user-copy"><strong>{session.name}</strong><span><b /> Online · {session.role}</span></div>
-            <button className="account-toggle" aria-label="Account menu" title="Account menu" type="button" onClick={() => setAccountOpen((value) => !value)}>
+            <button
+              className="account-toggle"
+              aria-label="Account menu"
+              title="Account menu"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setAccountOpen((value) => !value);
+              }}
+            >
               <ChevronUp aria-hidden="true" />
             </button>
           </div>
           <div className={`account-menu ${accountOpen ? "is-open" : ""}`}>
-            <button type="button"><UserRound aria-hidden="true" /> Profile</button>
-            <button type="button"><Bell aria-hidden="true" /> Notifications</button>
-            <div className="language-switch" aria-label="语言切换"><span>Language</span><div><button className="active" type="button">EN</button><button type="button">中文</button></div></div>
-            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> Sign out</button>
+            <div className="language-switch" aria-label="语言切换">
+              <span>语言</span>
+              <div>
+                <button aria-pressed={language === "EN"} className={language === "EN" ? "active" : ""} onClick={() => chooseLanguage("EN")} type="button">EN</button>
+                <button aria-pressed={language === "中文"} className={language === "中文" ? "active" : ""} onClick={() => chooseLanguage("中文")} type="button">中文</button>
+              </div>
+            </div>
+            <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> 退出登录</button>
           </div>
         </div>
       </aside>

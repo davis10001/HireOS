@@ -28,6 +28,31 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByLabelText("Agent 快捷输入")).toBeInTheDocument();
   });
 
+  it("opens account menu from the avatar area, switches language, and signs out", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderApp();
+
+    await user.type(screen.getByLabelText(/email/i), "linh@hireos.vn");
+    await user.type(screen.getByLabelText(/password/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await user.click(screen.getByRole("button", { name: /user menu for linh tran/i }));
+    const languageSwitch = screen.getByLabelText("语言切换");
+    expect(within(languageSwitch).getByText("语言")).toBeInTheDocument();
+    expect(within(languageSwitch).getByRole("button", { name: "EN" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(languageSwitch).getByRole("button", { name: "中文" }));
+    expect(within(languageSwitch).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+
+    unmount();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: /user menu for linh tran/i }));
+    expect(within(screen.getByLabelText("语言切换")).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "退出登录" }));
+    expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
+  });
+
   it("shows login validation errors and persists successful auth", async () => {
     const user = userEvent.setup();
     const { unmount } = renderApp();
@@ -124,7 +149,7 @@ describe("Login + Jobs prototype slice", () => {
     expect(within(agent).getByText("Review the Assessment rubric before sending another case, then keep the job Active.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /account menu/i }));
-    await user.click(screen.getByRole("button", { name: /sign out/i }));
+    await user.click(screen.getByRole("button", { name: "退出登录" }));
     expect(screen.getByRole("heading", { name: /sign in to hireos/i })).toBeInTheDocument();
   });
 
