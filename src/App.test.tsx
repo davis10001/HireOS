@@ -447,6 +447,29 @@ describe("Login + Jobs prototype slice", () => {
     expect(screen.getByText(/Completed action: Route to HR review/i)).toBeInTheDocument();
     expect(screen.getByText(/Routed to HR review by Linh Tran/i)).toBeInTheDocument();
   });
+
+  it("keeps Dashboard as a daily summary and jumps into filtered Tasks views", async () => {
+    window.history.pushState({}, "", "/dashboard");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "Daily Home" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open critical tasks/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open today due tasks/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open waiting on others tasks/i })).toBeInTheDocument();
+    expect(screen.getByText("Upcoming Interviews")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open batch review tasks/i })).toBeInTheDocument();
+    expect(screen.getByText("Recruitment Health")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open waiting on others tasks/i }));
+
+    expect(screen.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Waiting on Others" })).toHaveClass("active");
+    expect(screen.getByText("Assessment submission follow-up")).toBeInTheDocument();
+    expect(screen.queryByText("Founder final interview approval")).not.toBeInTheDocument();
+  });
 });
 
 async function login(user: ReturnType<typeof userEvent.setup>) {

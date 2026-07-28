@@ -622,6 +622,103 @@ body.sidebar-collapsed .user-status {
   color: var(--danger);
 }
 
+.dashboard-home {
+  gap: 16px;
+}
+
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-height: 146px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 0 rgba(17, 17, 17, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.summary-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.summary-card.warn {
+  border-color: #f3ddac;
+}
+
+.summary-card.danger {
+  border-color: #fed0b4;
+}
+
+.summary-card.green {
+  border-color: var(--green-line);
+}
+
+.summary-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--text-2);
+}
+
+.summary-card.warn .summary-icon {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.summary-card.danger .summary-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.summary-card.green .summary-icon {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.summary-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.summary-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.summary-copy > span {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.summary-copy strong {
+  font-size: 28px;
+  font-weight: 620;
+  line-height: 1;
+}
+
+.summary-copy small {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.42;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -2437,6 +2534,7 @@ body.dock-expanded .agent-dock-prompts {
 
   .hero-row,
   .content-grid,
+  .dashboard-summary-grid,
   .job-card-grid,
   .metric-grid,
   .three-grid,
