@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>HireOS Analytics</title><link rel="stylesheet" href="./hireos-pages.css" /><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航"><div class="brand"><button class="brand-mark sidebar-logo-toggle" aria-label="HireOS" title="HireOS">H</button><div class="brand-copy"><strong>HireOS</strong><span>AI Hiring Operating System</span></div><button class="icon-button sidebar-toggle" aria-label="收起侧边栏" title="收起侧边栏"><i data-lucide="panel-left-close"></i></button></div><div class="nav-section">Operate</div>
+      <nav class="nav">
+        <a class="nav-item" href="./hireos-dashboard-design.html"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+        <a class="nav-item" href="./hireos-jobs.html"><i data-lucide="briefcase-business"></i><span>Jobs</span><span class="count">12</span></a>
+        <a class="nav-item" href="./hireos-inbox.html"><i data-lucide="inbox"></i><span>Inbox</span><span class="count">76</span></a>
+        
+      </nav>
+      <div class="nav-section">Intelligence</div>
+      <nav class="nav">
+        <a class="nav-item active" href="./hireos-analytics.html"><i data-lucide="chart-no-axes-combined"></i><span>Analytics</span></a>
+        <a class="nav-item" href="./hireos-settings.html"><i data-lucide="settings"></i><span>Settings</span></a>
+      </nav><div class="sidebar-footer"><div class="user-status" role="button" tabindex="0" aria-expanded="false"><div class="avatar">LT</div><div class="user-copy"><strong>Linh Tran</strong><span><b></b> Online · HR Lead</span></div><button class="account-toggle" aria-label="账户菜单" title="账户菜单"><i data-lucide="chevron-up"></i></button></div><div class="account-menu"><button type="button"><i data-lucide="user-round"></i> Profile</button><button type="button"><i data-lucide="bell"></i> Notifications</button><div class="language-switch" aria-label="语言切换"><span>Language</span><div><button class="active" type="button">EN</button><button type="button">中文</button></div></div><button type="button"><i data-lucide="log-out"></i> Sign out</button></div></div></aside>
+    <main class="main">
+      <header class="topbar"><div class="page-title"><h1>Analytics</h1><p>招聘进展、HR 执行效率、渠道质量和基础 AI 采纳指标。</p></div><div class="top-actions"><button class="ghost-button"><i data-lucide="calendar-range"></i> Last 30 days</button></div></header>
+      <section class="page-content">
+        <section class="metric-grid"><div class="metric"><div class="metric-label">Active Jobs <i data-lucide="briefcase-business"></i></div><strong>12</strong><small>2 paused, 4 draft</small></div><div class="metric"><div class="metric-label">Active Applications <i data-lucide="kanban-square"></i></div><strong>168</strong><small>22 due today</small></div><div class="metric"><div class="metric-label">Email Match Accuracy <i data-lucide="mail-check"></i></div><strong>87%</strong><small>Human-confirmed matches</small></div><div class="metric"><div class="metric-label">Offer Decision Rate <i data-lucide="badge-check"></i></div><strong>4.2%</strong><small>MVP stops here</small></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>Recruiting Funnel</h2><p>CV to Offer Decision conversion</p></div><div class="tabs"><button class="tab active">Volume</button><button class="tab">Rate</button></div></div><div class="mini-funnel"><div class="mini-stage"><div class="mini-bar"><span style="height:94%"></span></div><strong>284</strong><small>CVs</small></div><div class="mini-stage"><div class="mini-bar"><span style="height:68%"></span></div><strong>168</strong><small>Review</small></div><div class="mini-stage"><div class="mini-bar"><span style="height:49%"></span></div><strong>92</strong><small>Shortlist</small></div><div class="mini-stage"><div class="mini-bar"><span style="height:32%"></span></div><strong>61</strong><small>Interview</small></div><div class="mini-stage"><div class="mini-bar"><span style="height:18%"></span></div><strong>12</strong><small>Offer Decision</small></div></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>Channel Quality</h2><p>Source attribution from CV to decision quality</p></div></div><div class="table analytics-table"><div class="table-row header"><span>Source</span><span>CVs</span><span>Shortlist</span><span>Interview</span><span>Offer Decision</span></div><div class="table-row"><div class="cell-main"><strong>Email inbound</strong><span>Recruiting mailbox</span></div><span>126</span><span>36%</span><span>18%</span><span class="pill green">6.1%</span></div><div class="table-row"><div class="cell-main"><strong>Referral</strong><span>Founder + team intros</span></div><span>48</span><span>44%</span><span>25%</span><span class="pill green">8.3%</span></div><div class="table-row"><div class="cell-main"><strong>Boss直聘</strong><span>平台投递</span></div><span>86</span><span>31%</span><span>15%</span><span class="pill warn">3.6%</span></div><div class="table-row"><div class="cell-main"><strong>猎聘</strong><span>中高端岗位渠道</span></div><span>54</span><span>39%</span><span>21%</span><span class="pill green">5.4%</span></div><div class="table-row"><div class="cell-main"><strong>VietnamWorks</strong><span>Manual upload / email</span></div><span>72</span><span>24%</span><span>12%</span><span class="pill warn">2.8%</span></div><div class="table-row"><div class="cell-main"><strong>Agency</strong><span>Forwarded profiles</span></div><span>38</span><span>29%</span><span>16%</span><span class="pill">3.1%</span></div></div></section>
+      </section>
+    </main>
+    <aside class="agent" aria-label="Agent 对话区"><header class="agent-header"><div class="agent-title"><div class="agent-orb"><i data-lucide="sparkles"></i></div><div><strong>Analytics AI Workspace</strong><span>Metrics with evidence</span></div></div><button class="icon-button agent-toggle" aria-label="收起 Agent" title="收起 Agent"><i data-lucide="panel-right-close"></i></button></header><div class="agent-body"><section class="agent-card ai"><h3>Operating insight</h3><p>Referral has the highest offer decision rate, but inbound email produces most total shortlisted candidates.</p><div class="evidence-list"><div class="evidence-item"><span>Evidence</span><strong>Referral offer decision rate is 8.3%; email inbound produces 45 shortlisted candidates.</strong></div><div class="evidence-item"><span>Risk</span><strong>Interview feedback SLA is dragging overall cycle time.</strong></div><div class="evidence-item"><span>Confidence</span><strong>High · based on structured source attribution.</strong></div></div><div class="agent-actions"><button class="approve">Create report</button><button class="review">Drill down</button></div></section></div><footer class="agent-compose"><div class="compose-box"><input aria-label="向 Agent 提问" placeholder="Ask about hiring metrics..." /><button class="icon-button" aria-label="发送"><i data-lucide="send-horizontal"></i></button></div></footer></aside>
+  <div class="agent-dock" aria-label="Agent 快捷输入">
+    <button class="agent-dock-bar" type="button">
+      <i data-lucide="sparkles"></i>
+      <span>Ask HireOS Agent about this page...</span>
+      <i data-lucide="send-horizontal"></i>
+    </button>
+    <div class="agent-dock-prompts">
+      <button type="button">Summarize risks</button>
+      <button type="button">Suggest next action</button>
+      <button type="button">Show evidence gaps</button>
+    </div>
+  </div>
+  </div><script src="./hireos-pages.js"></script>
+</body></html>

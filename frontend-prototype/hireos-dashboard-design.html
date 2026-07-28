@@ -1,0 +1,2013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HireOS Dashboard Design</title>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --green: #76fb91;
+      --green-soft: #e8fff0;
+      --green-line: #baf6c6;
+      --bg: #f7f7f5;
+      --surface: #ffffff;
+      --surface-soft: #fbfbfa;
+      --border: #e8e8e5;
+      --border-strong: #d7d7d2;
+      --text: #111111;
+      --text-2: #666666;
+      --text-3: #999999;
+      --danger: #c2410c;
+      --danger-soft: #fff3ed;
+      --warning: #8a6100;
+      --warning-soft: #fff8df;
+      --radius-card: 16px;
+      --radius-pill: 999px;
+      --shadow-soft: 0 1px 0 rgba(17, 17, 17, 0.04);
+      --font: "Geist", "Inter", "SF Pro Display", "HarmonyOS Sans SC", "Source Han Sans SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(620px, 1fr) 384px;
+      height: 100vh;
+      max-width: 1728px;
+      margin: 0 auto;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      transition: grid-template-columns 180ms ease-out;
+    }
+
+    body.sidebar-collapsed .app-shell {
+      grid-template-columns: 84px minmax(620px, 1fr) 384px;
+    }
+
+    body.agent-collapsed .app-shell {
+      grid-template-columns: 248px minmax(620px, 1fr) 64px;
+    }
+
+    body.sidebar-collapsed.agent-collapsed .app-shell {
+      grid-template-columns: 84px minmax(620px, 1fr) 64px;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: #fbfbfa;
+      border-right: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 72px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand .sidebar-toggle {
+      margin-left: auto;
+      width: 34px;
+      min-height: 34px;
+      border-radius: 10px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      background: var(--text);
+      color: var(--surface);
+      cursor: pointer;
+      font-weight: 650;
+      font-size: 14px;
+    }
+
+    .brand-mark svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 1.9;
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .brand-copy span {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-3);
+      font-size: 11px;
+    }
+
+    body.sidebar-collapsed .brand {
+      justify-content: center;
+      padding: 0 14px;
+    }
+
+    body.sidebar-collapsed .brand-copy,
+    body.sidebar-collapsed .brand .sidebar-toggle,
+    body.sidebar-collapsed .nav-section,
+    body.sidebar-collapsed .nav-item span:not(.count),
+    body.sidebar-collapsed .nav-item .count,
+    body.sidebar-collapsed .user-copy,
+    body.sidebar-collapsed .account-toggle,
+    body.sidebar-collapsed .account-menu {
+      display: none;
+    }
+
+    body.sidebar-collapsed .nav {
+      padding: 14px 10px 0;
+    }
+
+    body.sidebar-collapsed .nav-item {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .nav {
+      display: grid;
+      gap: 2px;
+      padding: 0 12px;
+    }
+
+    .nav-section {
+      margin: 18px 12px 8px;
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 620;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: 12px;
+      color: var(--text-2);
+      font-size: 14px;
+    }
+
+    .nav-item svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 1.8;
+    }
+
+    .nav-item.active {
+      background: var(--text);
+      color: var(--surface);
+    }
+
+    .nav-item .count {
+      margin-left: auto;
+      padding: 2px 7px;
+      border-radius: var(--radius-pill);
+      background: var(--green-soft);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 620;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px;
+    }
+
+    .user-status {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 28px;
+      gap: 10px;
+      align-items: center;
+      padding: 6px 4px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .user-status:hover {
+      background: #f0f0ed;
+    }
+
+    .user-copy {
+      min-width: 0;
+    }
+
+    .user-copy strong {
+      display: block;
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 620;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .user-copy span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 3px;
+      color: var(--text-3);
+      font-size: 11px;
+    }
+
+    .user-copy b {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 2px var(--green-soft);
+    }
+
+    .account-toggle {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-3);
+      cursor: pointer;
+    }
+
+    .account-menu {
+      display: none;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 12px 32px rgba(17, 17, 17, 0.08);
+    }
+
+    body.account-menu-open .account-menu {
+      display: grid;
+    }
+
+    .account-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-2);
+      cursor: pointer;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .account-menu button:hover,
+    .account-menu button.active {
+      background: var(--green-soft);
+      color: var(--text);
+    }
+
+    .language-switch {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .language-switch span {
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 620;
+      text-transform: uppercase;
+    }
+
+    .language-switch div {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .language-switch button {
+      justify-content: center;
+      min-height: 30px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      text-align: center;
+    }
+
+    body.sidebar-collapsed .sidebar-footer {
+      padding: 14px;
+    }
+
+    body.sidebar-collapsed .user-status {
+      display: flex;
+      justify-content: center;
+      padding: 8px;
+    }
+
+    .main {
+      min-width: 0;
+      overflow: auto;
+      background: var(--surface);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    .page-title {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 620;
+      line-height: 1.1;
+    }
+
+    .date-chip {
+      color: var(--text-3);
+      font-size: 13px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-button,
+    .primary-button,
+    .ai-button,
+    .ghost-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out;
+    }
+
+    .icon-button {
+      width: 40px;
+      background: var(--surface);
+      color: var(--text-2);
+    }
+
+    .icon-button:hover,
+    .ghost-button:hover {
+      background: var(--surface-soft);
+      border-color: var(--border-strong);
+    }
+
+    .primary-button,
+    .ai-button,
+    .ghost-button {
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 560;
+    }
+
+    .primary-button {
+      border-color: var(--text);
+      background: var(--text);
+      color: var(--surface);
+    }
+
+    .ai-button {
+      border-color: var(--green);
+      background: var(--green);
+      color: var(--text);
+    }
+
+    .ghost-button {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .page-content {
+      display: grid;
+      gap: 20px;
+      padding: 24px 28px 32px;
+    }
+
+    .summary-band {
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .brief-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      min-height: 76px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      margin-bottom: 6px;
+      padding: 5px 9px;
+      border-radius: var(--radius-pill);
+      background: var(--green-soft);
+      color: #25552c;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .brief-panel h2,
+    .panel h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 620;
+      line-height: 1.2;
+    }
+
+    .brief-panel h2 {
+      display: -webkit-box;
+      overflow: hidden;
+      font-size: 18px;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .brief-panel p {
+      display: none;
+    }
+
+    .brief-actions {
+      display: none;
+      gap: 8px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .decision-stack {
+      display: grid;
+      grid-template-columns: repeat(2, 176px);
+      gap: 10px;
+      align-content: start;
+    }
+
+    .decision-mini {
+      display: grid;
+      gap: 4px;
+      min-height: 48px;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .decision-mini span {
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 610;
+      text-transform: uppercase;
+    }
+
+    .decision-mini strong {
+      overflow: hidden;
+      font-size: 12px;
+      font-weight: 620;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .metric-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--text-2);
+      font-size: 12px;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 14px;
+      font-size: 28px;
+      font-weight: 620;
+      line-height: 1;
+    }
+
+    .metric small {
+      display: block;
+      margin-top: 10px;
+      color: var(--text-3);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .metric.warning strong {
+      color: var(--danger);
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 1.1fr) minmax(300px, 0.9fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .single-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .panel-header p {
+      margin: 5px 0 0;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+
+    .tabs {
+      display: flex;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-soft);
+    }
+
+    .tab {
+      min-height: 32px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-2);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 0 rgba(17, 17, 17, 0.05);
+    }
+
+    .funnel {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(72px, 1fr));
+      gap: 8px;
+      align-items: end;
+      min-height: 190px;
+      padding-top: 8px;
+    }
+
+    .stage {
+      display: grid;
+      align-content: end;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .bar {
+      display: grid;
+      align-items: end;
+      min-height: 72px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #f4f4f1 0%, #ecece8 100%);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      border-radius: 14px;
+      background: var(--text);
+    }
+
+    .bar-fill.ai {
+      background: var(--green);
+    }
+
+    .stage strong {
+      display: inline;
+      font-size: 18px;
+      font-weight: 620;
+      line-height: 1;
+    }
+
+    .stage span {
+      display: inline;
+      overflow: hidden;
+      margin-left: 5px;
+      color: var(--text-3);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .stage-label {
+      display: flex;
+      align-items: baseline;
+      min-width: 0;
+      white-space: nowrap;
+    }
+
+    .job-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .job-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px 12px;
+      align-items: center;
+      min-height: 72px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .job-row .pill {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    .job-title {
+      min-width: 0;
+    }
+
+    .job-title strong {
+      display: block;
+      overflow: hidden;
+      font-size: 14px;
+      font-weight: 610;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .job-title span {
+      display: block;
+      margin-top: 4px;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+
+    .progress {
+      display: grid;
+      gap: 7px;
+      grid-column: 1 / -1;
+    }
+
+    .progress-track {
+      height: 7px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: #ededeb;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--text);
+    }
+
+    .progress span {
+      color: var(--text-3);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      min-height: 28px;
+      padding: 0 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      background: var(--surface);
+      color: var(--text-2);
+      font-size: 12px;
+      font-weight: 560;
+      white-space: nowrap;
+    }
+
+    .pill.green {
+      border-color: var(--green-line);
+      background: var(--green-soft);
+      color: #24572c;
+    }
+
+    .pill.warn {
+      border-color: #f1d48c;
+      background: var(--warning-soft);
+      color: var(--warning);
+    }
+
+    .pill.danger {
+      border-color: #fed0b4;
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .queue {
+      display: grid;
+      gap: 10px;
+    }
+
+    .queue-item {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 68px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--text);
+      color: var(--surface);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .queue-copy {
+      min-width: 0;
+    }
+
+    .queue-copy strong {
+      display: block;
+      overflow: hidden;
+      font-size: 14px;
+      font-weight: 610;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .queue-copy span {
+      display: block;
+      margin-top: 4px;
+      overflow: hidden;
+      color: var(--text-3);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 0;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 54px;
+      border-top: 1px solid var(--border);
+    }
+
+    .timeline-row:first-child {
+      border-top: 0;
+    }
+
+    .timeline-row time {
+      color: var(--text-3);
+      font-size: 12px;
+    }
+
+    .timeline-copy strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 610;
+    }
+
+    .timeline-copy span {
+      display: block;
+      margin-top: 3px;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+
+    .agent {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-left: 1px solid var(--border);
+      background: #fbfbfa;
+      overflow: hidden;
+    }
+
+    .agent-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    body.agent-collapsed .agent-header {
+      justify-content: center;
+      padding: 0;
+    }
+
+    body.agent-collapsed .agent-title,
+    body.agent-collapsed .agent-body,
+    body.agent-collapsed .agent-compose {
+      display: none;
+    }
+
+    .agent-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .agent-orb {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: var(--green);
+      color: var(--text);
+    }
+
+    .agent-title strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .agent-title span {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-3);
+      font-size: 11px;
+    }
+
+    .agent-body {
+      display: grid;
+      gap: 14px;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .agent-card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .agent-card.ai {
+      border-color: var(--green-line);
+      background: var(--green-soft);
+    }
+
+    .agent-card h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .agent-card p {
+      margin: 8px 0 0;
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .evidence-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .evidence-item {
+      display: grid;
+      gap: 3px;
+      padding: 10px;
+      border: 1px solid rgba(17, 17, 17, 0.08);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .evidence-item span {
+      color: var(--text-3);
+      font-size: 11px;
+      font-weight: 610;
+      text-transform: uppercase;
+    }
+
+    .evidence-item strong {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .agent-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .agent-actions button {
+      min-height: 38px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 610;
+    }
+
+    .approve {
+      border: 1px solid var(--text);
+      background: var(--text);
+      color: var(--surface);
+    }
+
+    .review {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .message {
+      display: grid;
+      gap: 8px;
+    }
+
+    .message-bubble {
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .message.user {
+      justify-items: end;
+    }
+
+    .message.user .message-bubble {
+      max-width: 88%;
+      background: var(--text);
+      color: var(--surface);
+    }
+
+    .agent-compose {
+      margin-top: auto;
+      padding: 14px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: #fbfbfa;
+    }
+
+    .compose-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 40px;
+      gap: 8px;
+      align-items: center;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .compose-box input {
+      min-width: 0;
+      height: 36px;
+      border: 0;
+      outline: none;
+      padding: 0 10px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .agent-dock {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 40;
+      display: none;
+      width: min(720px, calc(100vw - 220px));
+      transform: translateX(-50%);
+    }
+
+    body.agent-collapsed .agent-dock {
+      display: grid;
+      gap: 8px;
+    }
+
+    .agent-dock-bar {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) 28px;
+      align-items: center;
+      gap: 10px;
+      min-height: 56px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 18px 48px rgba(17, 17, 17, 0.12);
+      color: var(--text-2);
+      cursor: pointer;
+      text-align: left;
+      backdrop-filter: blur(14px);
+    }
+
+    .agent-dock-bar svg:first-child {
+      width: 24px;
+      height: 24px;
+      padding: 4px;
+      border-radius: 9px;
+      background: var(--green);
+      color: var(--text);
+    }
+
+    .agent-dock-bar svg:last-child {
+      justify-self: end;
+      color: var(--text);
+    }
+
+    .agent-dock-bar span {
+      overflow: hidden;
+      font-size: 14px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .agent-dock-prompts {
+      display: none;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 12px 32px rgba(17, 17, 17, 0.08);
+      backdrop-filter: blur(14px);
+    }
+
+    body.dock-expanded .agent-dock-prompts {
+      display: grid;
+    }
+
+    .agent-dock-prompts button {
+      min-height: 38px;
+      border: 1px solid var(--green-line);
+      border-radius: 12px;
+      background: var(--green-soft);
+      color: #24572c;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 610;
+    }
+
+    @media (max-width: 1180px) {
+      .app-shell {
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+
+      body.sidebar-collapsed .app-shell,
+      body.agent-collapsed .app-shell,
+      body.sidebar-collapsed.agent-collapsed .app-shell {
+        grid-template-columns: 84px minmax(0, 1fr);
+      }
+
+      .agent {
+        display: none;
+      }
+
+      .summary-band,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app-shell {
+        display: block;
+        height: auto;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        height: auto;
+        padding: 18px;
+        flex-direction: column;
+      }
+
+      .page-content {
+        padding: 18px;
+      }
+
+      .agent-dock {
+        width: calc(100vw - 24px);
+        bottom: 12px;
+      }
+
+      .agent-dock-prompts {
+        grid-template-columns: 1fr;
+      }
+
+      .brief-panel,
+      .decision-stack,
+      .metric-grid,
+      .funnel,
+      .job-row,
+      .timeline-row {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-grid {
+        gap: 10px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <button class="brand-mark sidebar-logo-toggle" aria-label="HireOS" title="HireOS">H</button>
+        <div class="brand-copy">
+          <strong>HireOS</strong>
+          <span>AI Hiring Operating System</span>
+        </div>
+        <button class="icon-button sidebar-toggle" aria-label="收起侧边栏" title="收起侧边栏"><i data-lucide="panel-left-close"></i></button>
+      </div>
+
+      <div class="nav-section">Operate</div>
+      <nav class="nav">
+        <a class="nav-item active" href="./hireos-dashboard-design.html"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+        <a class="nav-item" href="./hireos-jobs.html"><i data-lucide="briefcase-business"></i><span>Jobs</span><span class="count">12</span></a>
+        <a class="nav-item" href="./hireos-inbox.html"><i data-lucide="inbox"></i><span>Inbox</span><span class="count">76</span></a>
+        
+      </nav>
+
+      <div class="nav-section">Intelligence</div>
+      <nav class="nav">
+        <a class="nav-item" href="./hireos-analytics.html"><i data-lucide="chart-no-axes-combined"></i><span>Analytics</span></a>
+        <a class="nav-item" href="./hireos-settings.html"><i data-lucide="settings"></i><span>Settings</span></a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-status" role="button" tabindex="0" aria-expanded="false">
+          <div class="avatar">LT</div>
+          <div class="user-copy">
+            <strong>Linh Tran</strong>
+            <span><b></b> Online · HR Lead</span>
+          </div>
+          <button class="account-toggle" aria-label="账户菜单" title="账户菜单"><i data-lucide="chevron-up"></i></button>
+        </div>
+        <div class="account-menu">
+          <button type="button"><i data-lucide="user-round"></i> Profile</button>
+          <button type="button"><i data-lucide="bell"></i> Notifications</button>
+          <div class="language-switch" aria-label="语言切换">
+            <span>Language</span>
+            <div>
+              <button class="active" type="button">EN</button>
+              <button type="button">中文</button>
+            </div>
+          </div>
+          <button type="button"><i data-lucide="log-out"></i> Sign out</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <h1>Dashboard</h1>
+          <span class="date-chip">Monday, Jul 27</span>
+        </div>
+      </header>
+
+      <section class="page-content">
+        <section class="metric-grid" aria-label="招聘核心指标">
+          <div class="metric">
+            <div class="metric-label">Total CVs <i data-lucide="file-stack"></i></div>
+            <strong>284</strong>
+            <small>+42 from email intake this week</small>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Pending HR Review <i data-lucide="mail-question"></i></div>
+            <strong>31</strong>
+            <small>14 low-confidence job matches</small>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Founder Decisions <i data-lucide="circle-dot-dashed"></i></div>
+            <strong>5</strong>
+            <small>3 final interview, 2 offer decision</small>
+          </div>
+          <div class="metric warning">
+            <div class="metric-label">Blocked Applications <i data-lucide="octagon-alert"></i></div>
+            <strong>9</strong>
+            <small>4 overdue SLA, 3 missing owner</small>
+          </div>
+        </section>
+
+        <section class="single-row">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Recruiting Funnel</h2>
+                <p>All active jobs, email-first applications</p>
+              </div>
+              <div class="tabs" aria-label="漏斗时间范围">
+                <button class="tab active">Week</button>
+                <button class="tab">Month</button>
+                <button class="tab">Quarter</button>
+              </div>
+            </div>
+            <div class="funnel">
+              <div class="stage">
+                <div class="bar"><div class="bar-fill" style="height: 92%"></div></div>
+                <div class="stage-label"><strong>284</strong><span>CV Intake</span></div>
+              </div>
+              <div class="stage">
+                <div class="bar"><div class="bar-fill" style="height: 68%"></div></div>
+                <div class="stage-label"><strong>168</strong><span>HR Review</span></div>
+              </div>
+              <div class="stage">
+                <div class="bar"><div class="bar-fill" style="height: 49%"></div></div>
+                <div class="stage-label"><strong>92</strong><span>Shortlist</span></div>
+              </div>
+              <div class="stage">
+                <div class="bar"><div class="bar-fill" style="height: 38%"></div></div>
+                <div class="stage-label"><strong>61</strong><span>Interview</span></div>
+              </div>
+              <div class="stage">
+                <div class="bar"><div class="bar-fill ai" style="height: 27%"></div></div>
+                <div class="stage-label"><strong>34</strong><span>Assessment</span></div>
+              </div>
+              <div class="stage">
+                <div class="bar"><div class="bar-fill ai" style="height: 18%"></div></div>
+                <div class="stage-label"><strong>12</strong><span>Offer Decision</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Job Progress</h2>
+                <p>Role-level pipeline health and SLA exposure</p>
+              </div>
+              <button class="ghost-button"><i data-lucide="arrow-up-right"></i> View jobs</button>
+            </div>
+            <div class="job-list">
+              <div class="job-row">
+                <div class="job-title"><strong>Senior Backend Engineer</strong><span>Owner: Linh Tran · 74 applications</span></div>
+                <div class="progress"><div class="progress-track"><div class="progress-fill" style="width: 72%"></div></div></div>
+                <span class="pill warn">3 blocked</span>
+              </div>
+              <div class="job-row">
+                <div class="job-title"><strong>Product Designer</strong><span>Owner: Mai Ho · 43 applications</span></div>
+                <div class="progress"><div class="progress-track"><div class="progress-fill" style="width: 54%"></div></div></div>
+                <span class="pill danger">Overdue</span>
+              </div>
+              <div class="job-row">
+                <div class="job-title"><strong>GTM Lead</strong><span>Owner: Bao Vo · 38 applications</span></div>
+                <div class="progress"><div class="progress-track"><div class="progress-fill" style="width: 81%"></div></div></div>
+                <span class="pill green">Healthy</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Pending</h2>
+                <p>Evidence-first decisions waiting for human approval</p>
+              </div>
+              <span class="pill green">5 open</span>
+            </div>
+            <div class="queue">
+              <div class="queue-item">
+                <div class="avatar">TN</div>
+                <div class="queue-copy"><strong>Trang Nguyen</strong><span>Senior Backend Engineer · Final interview</span></div>
+                <span class="pill green">Ready</span>
+              </div>
+              <div class="queue-item">
+                <div class="avatar">AL</div>
+                <div class="queue-copy"><strong>Anh Le</strong><span>Product Designer · Assessment review</span></div>
+                <span class="pill warn">Risk</span>
+              </div>
+              <div class="queue-item">
+                <div class="avatar">MP</div>
+                <div class="queue-copy"><strong>Minh Pham</strong><span>GTM Lead · Offer decision</span></div>
+                <span class="pill">Review</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="single-row">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Evidence Timeline</h2>
+                <p>Latest structured events from email and interviews</p>
+              </div>
+            </div>
+            <div class="timeline">
+              <div class="timeline-row">
+                <time>10:42</time>
+                <div class="timeline-copy"><strong>Assessment submission parsed</strong><span>Trang Nguyen · 3 files attached</span></div>
+                <span class="pill green">AI</span>
+              </div>
+              <div class="timeline-row">
+                <time>09:18</time>
+                <div class="timeline-copy"><strong>Interview feedback extracted</strong><span>Product Designer · evidence gap reduced</span></div>
+                <span class="pill">Email</span>
+              </div>
+              <div class="timeline-row">
+                <time>08:55</time>
+                <div class="timeline-copy"><strong>Low-confidence job match</strong><span>Candidate may fit Backend or Platform</span></div>
+                <span class="pill warn">Review</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <aside class="agent" aria-label="Agent 对话区">
+      <header class="agent-header">
+        <div class="agent-title">
+          <div class="agent-orb"><i data-lucide="sparkles"></i></div>
+          <div>
+            <strong>HireOS Agent</strong>
+            <span>Evidence, risk, next action</span>
+          </div>
+        </div>
+        <button class="icon-button agent-toggle" aria-label="收起 Agent" title="收起 Agent"><i data-lucide="panel-right-close"></i></button>
+      </header>
+
+      <div class="agent-body">
+        <section class="agent-card ai">
+          <h3>Recommended next move</h3>
+          <p>Approve final interview for Trang Nguyen and ask HR to clarify availability before Friday.</p>
+          <div class="evidence-list">
+            <div class="evidence-item"><span>Evidence</span><strong>Assessment score exceeds Backend rubric threshold in system design and debugging.</strong></div>
+            <div class="evidence-item"><span>Risk</span><strong>Candidate mentioned another offer timeline in yesterday's email.</strong></div>
+            <div class="evidence-item"><span>Confidence</span><strong>High · 7 linked evidence events, no unresolved interviewer conflict.</strong></div>
+          </div>
+          <div class="agent-actions">
+            <button class="approve">Approve</button>
+            <button class="review">Open card</button>
+          </div>
+        </section>
+
+        <div class="message">
+          <div class="message-bubble">I found 9 blocked applications. The biggest pattern is missing interview feedback after scheduling confirmation.</div>
+        </div>
+        <div class="message user">
+          <div class="message-bubble">Which ones need Founder attention?</div>
+        </div>
+        <div class="message">
+          <div class="message-bubble">Three: Anh Le has mixed design feedback, Minh Pham needs offer decision, and Trang Nguyen has a competing timeline risk.</div>
+        </div>
+
+        <section class="agent-card">
+          <h3>Draft action</h3>
+          <p>Send HR a concise follow-up list for overdue feedback and low-confidence job matches.</p>
+          <div class="agent-actions">
+            <button class="approve">Create tasks</button>
+            <button class="review">Edit draft</button>
+          </div>
+        </section>
+      </div>
+
+      <footer class="agent-compose">
+        <div class="compose-box">
+          <input aria-label="向 Agent 提问" placeholder="Ask about pipeline, evidence, risk..." />
+          <button class="icon-button" aria-label="发送"><i data-lucide="send-horizontal"></i></button>
+        </div>
+      </footer>
+    </aside>
+
+    <div class="agent-dock" aria-label="Agent 快捷输入">
+      <button class="agent-dock-bar" type="button">
+        <i data-lucide="sparkles"></i>
+        <span>Ask HireOS Agent about this page...</span>
+        <i data-lucide="send-horizontal"></i>
+      </button>
+      <div class="agent-dock-prompts">
+        <button type="button">Summarize risks</button>
+        <button type="button">Suggest next action</button>
+        <button type="button">Show evidence gaps</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function refreshIcons() {
+      lucide.createIcons();
+    }
+
+    function setToggleIcon(button, icon, label) {
+      button.innerHTML = `<i data-lucide="${icon}"></i>`;
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+      refreshIcons();
+    }
+
+    const zhTextMap = new Map([
+      ["Dashboard", "仪表盘"],
+      ["Jobs", "岗位"],
+      ["Inbox", "待办箱"],
+      ["Email Agent", "邮件 Agent"],
+      ["Applications", "申请流程"],
+      ["Candidates", "候选人"],
+      ["Assessments", "测评"],
+      ["Founder Inbox", "创始人收件箱"],
+      ["Blocked", "阻塞项"],
+      ["Analytics", "分析"],
+      ["Settings", "设置"],
+      ["Operate", "运营"],
+      ["Intelligence", "智能分析"],
+      ["Decision", "决策"],
+      ["Profile", "个人资料"],
+      ["Notifications", "通知"],
+      ["Language", "语言"],
+      ["Sign out", "退出登录"],
+      ["Online · HR Lead", "在线 · HR 负责人"],
+      ["Ask HireOS Agent about this page...", "向 HireOS Agent 询问当前页面..."],
+      ["Summarize risks", "总结风险"],
+      ["Suggest next action", "建议下一步"],
+      ["Show evidence gaps", "查看证据缺口"],
+      ["Ask Agent", "询问 Agent"],
+      ["New Job", "新建岗位"],
+      ["Filters", "筛选"],
+      ["Sync", "同步"],
+      ["Connect Mailbox", "连接邮箱"],
+      ["Draft rubric", "起草 Rubric"],
+      ["Send assessment", "发送测评"],
+      ["Export", "导出"],
+      ["Batch Review", "批量审核"],
+      ["Resolve Batch", "批量处理"],
+      ["Add Application", "新增申请"],
+      ["New Candidate", "新增候选人"],
+      ["Import CV", "导入 CV"],
+      ["Pending", "待处理"],
+      ["Review decisions", "查看决策"],
+      ["Resolve blocked", "处理阻塞"],
+      ["Approve", "批准"],
+      ["Open card", "打开卡片"],
+      ["Create tasks", "创建任务"],
+      ["Edit draft", "编辑草稿"],
+      ["Merge", "合并"],
+      ["Inspect", "检查"],
+      ["Apply", "应用"],
+      ["Open", "打开"],
+      ["Compare", "对比"],
+      ["Create report", "生成报告"],
+      ["Drill down", "下钻"],
+      ["Ready", "就绪"],
+      ["Review", "审核"],
+      ["Risk", "风险"],
+      ["Healthy", "健康"],
+      ["Overdue", "逾期"],
+      ["Complete", "完整"],
+      ["Partial", "部分"],
+      ["Monday, Jul 27", "7月27日，星期一"],
+      ["AI Daily Brief", "AI 每日简报"],
+      ["Founder attention is needed on 5 decisions and 3 stalled high-value applications.", "5 个决策和 3 个停滞的高价值申请需要创始人关注。"],
+      ["AI found delayed feedback in Product Designer and Backend Engineer pipelines. Two candidates have strong evidence for final interview, but both have open compensation and timeline risks.", "AI 发现产品设计师和后端工程师流程中存在反馈延迟。两位候选人具备进入终面的强证据，但都存在薪酬和时间风险。"],
+      ["Next critical action", "下一项关键动作"],
+      ["Approve Assessment rubric for Senior Backend", "批准高级后端测评 Rubric"],
+      ["Risk window", "风险窗口"],
+      ["2 high-fit candidates inactive over 72h", "2 位高匹配候选人超过 72 小时无进展"],
+      ["Recommendation confidence", "推荐置信度"],
+      ["Evidence coverage is high across email intake, interview notes, and assessment submissions.", "邮件录入、面试记录和测评提交中的证据覆盖度较高。"],
+      ["86% evidence coverage", "86% 证据覆盖"],
+      ["Total CVs", "CV 总数"],
+      ["Pending HR Review", "待 HR 审核"],
+      ["Founder Decisions", "招聘经理决策"],
+      ["Blocked Applications", "阻塞申请"],
+      ["Recruiting Funnel", "招聘漏斗"],
+      ["All active jobs, email-first applications", "所有活跃岗位，邮件优先申请"],
+      ["Week", "周"],
+      ["Month", "月"],
+      ["Quarter", "季度"],
+      ["CV Intake", "CV 录入"],
+      ["HR Review", "HR 审核"],
+      ["Shortlist", "入围"],
+      ["Offer Decision", "Offer 决策"],
+      ["Evidence-first decisions waiting for human approval", "等待人工审批的证据优先决策"],
+      ["Job Progress", "岗位进展"],
+      ["Role-level pipeline health and SLA exposure", "岗位级流程健康度与 SLA 暴露"],
+      ["View jobs", "查看岗位"],
+      ["Senior Backend Engineer", "高级后端工程师"],
+      ["Product Designer", "产品设计师"],
+      ["GTM Lead", "GTM 负责人"],
+      ["Evidence Timeline", "证据时间线"],
+      ["Latest structured events from email and interviews", "来自邮件和面试的最新结构化事件"],
+      ["Assessment submission parsed", "测评提交已解析"],
+      ["Interview feedback extracted", "面试反馈已提取"],
+      ["Low-confidence job match", "低置信度岗位匹配"],
+      ["Recommended next move", "推荐下一步"],
+      ["Approve final interview for Trang Nguyen and ask HR to clarify availability before Friday.", "批准 Trang Nguyen 进入终面，并请 HR 在周五前确认可面试时间。"],
+      ["Draft action", "草拟动作"],
+      ["Send HR a concise follow-up list for overdue feedback and low-confidence job matches.", "向 HR 发送一份简洁的跟进清单，涵盖逾期反馈和低置信度岗位匹配。"],
+      ["Candidate is the person record. Applications keep the job-specific process separate.", "Candidate 是人的记录；Application 保留具体岗位下的流程。"],
+      ["This prevents one candidate's multiple role histories from collapsing into a single vague status.", "这可以避免同一候选人的多个岗位历史被压成一个模糊状态。"],
+      ["Deduplication insight", "去重洞察"],
+      ["11 profiles may be duplicates based on phone, email aliases, CV filename, and agency-forwarded attachments.", "基于手机号、邮箱别名、CV 文件名和猎头转发附件，11 份档案可能重复。"],
+      ["Duplicates", "重复项"],
+      ["Need HR merge review", "需要 HR 合并审核"],
+      ["Multi-role", "多岗位"],
+      ["Applied to 2+ jobs", "申请 2 个以上岗位"],
+      ["CV Versions", "CV 版本"],
+      ["Updated attachments retained", "已保留更新附件"],
+      ["Candidate Registry", "候选人库"],
+      ["Identity, source, CV history, and cross-job context", "身份、来源、CV 历史和跨岗位上下文"],
+      ["All", "全部"],
+      ["High value", "高价值"],
+      ["Dedup watch", "去重监控"],
+      ["Candidate", "候选人"],
+      ["Source", "来源"],
+      ["Latest Evidence", "最新证据"],
+      ["Status", "状态"],
+      ["High fit", "高匹配"],
+      ["Duplicate signal", "重复信号"],
+      ["Duplicate Review", "重复审核"],
+      ["Merge candidates only with evidence", "仅在有证据时合并候选人"],
+      ["Same phone number, different agency email. CV skill section has 89% overlap.", "手机号相同，但猎头邮箱不同。CV 技能部分重合度 89%。"],
+      ["Email alias match and same attachment hash.", "邮箱别名匹配，附件哈希相同。"],
+      ["Candidate History", "候选人历史"],
+      ["Cross-job evidence continuity", "跨岗位证据连续性"],
+      ["Backend application", "后端申请"],
+      ["Assessment and interview evidence retained", "已保留测评和面试证据"],
+      ["Active", "活跃"],
+      ["Platform referral", "平台岗位推荐"],
+      ["Rejected due to seniority mismatch", "因资历不匹配被拒"],
+      ["Past", "历史"],
+      ["Candidate Agent", "候选人 Agent"],
+      ["Identity and history", "身份与历史"],
+      ["Merge recommendation", "合并建议"],
+      ["Hold Quang Do merge for HR review. Evidence is suggestive, not definitive.", "暂缓合并 Quang Do，交由 HR 审核。证据有提示性，但还不够确定。"],
+      ["Phone number matches, but source email differs.", "手机号匹配，但来源邮箱不同。"],
+      ["Wrong merge could pollute two application timelines.", "错误合并可能污染两条申请时间线。"],
+      ["Queue review", "加入审核队列"],
+      ["48 email threads need structured decisions before they touch the pipeline.", "48 个邮件线程需要先结构化判断，再进入流程。"],
+      ["The page separates high-confidence automation from low-confidence HR review, preserving raw email evidence for every extracted event.", "本页区分高置信度自动化和低置信度 HR 审核，并为每个提取事件保留原始邮件证据。"],
+      ["AI intake rule", "AI 录入规则"],
+      ["Auto-create Applications only when candidate, job, source, and attachment evidence all pass confidence threshold.", "仅当候选人、岗位、来源和附件证据都达到置信度阈值时，才自动创建 Application。"],
+      ["Threads Parsed", "已解析线程"],
+      ["CV Attachments", "CV 附件"],
+      ["Auto Matched", "自动匹配"],
+      ["Needs Review", "需要审核"],
+      ["Intake Queue", "录入队列"],
+      ["Email threads before candidate/application updates", "候选人/申请更新前的邮件线程"],
+      ["Auto Applied", "自动应用"],
+      ["Drafts", "草稿"],
+      ["Evidence extraction on", "证据提取已开启"],
+      ["Email Thread", "邮件线程"],
+      ["Detected Type", "识别类型"],
+      ["Job Match", "岗位匹配"],
+      ["AI Action", "AI 动作"],
+      ["Create Application", "创建申请"],
+      ["Update Interview", "更新面试"],
+      ["Attach Evidence", "附加证据"],
+      ["Ask HR", "询问 HR"],
+      ["Low conf.", "低置信度"],
+      ["Drafted Replies", "已起草回复"],
+      ["Human approval before sensitive messages", "敏感消息发送前需人工批准"],
+      ["Mailbox Rules", "邮箱规则"],
+      ["Current automation boundaries", "当前自动化边界"],
+      ["Never reject automatically", "永不自动拒绝"],
+      ["Low-confidence matches enter queue", "低置信度匹配进入队列"],
+      ["Extraction and approval", "提取与审批"],
+      ["Recommended review", "推荐审核"],
+      ["Confirm the agency-forwarded profile before creating a Platform application.", "创建平台岗位申请前，先确认猎头转发的档案。"],
+      ["Show low-confidence matches, draft a reply, or explain why a thread was classified.", "查看低置信度匹配、起草回复，或解释线程分类原因。"],
+      ["Application is the operating unit: candidate plus job plus workflow state.", "Application 是运营单元：候选人 + 岗位 + 流程状态。"],
+      ["This page keeps people, roles, and process history separate, so HR can move work forward without losing evidence.", "本页将人、岗位和流程历史分开，让 HR 在推进流程时不丢失证据。"],
+      ["AI next-step rule", "AI 下一步规则"],
+      ["No active Application should be missing Current Owner, Next Action, Due Date, or Evidence links.", "任何活跃 Application 都不应缺少当前负责人、下一步动作、截止时间或证据链接。"],
+      ["Active Applications", "活跃申请"],
+      ["Due Today", "今日到期"],
+      ["Waiting Candidate", "等待候选人"],
+      ["Missing Owner", "缺少负责人"],
+      ["Pipeline Workbench", "流程工作台"],
+      ["Status, owner, next action and SLA in one table", "状态、负责人、下一步和 SLA 汇总在一张表中"],
+      ["State", "状态"],
+      ["Owner", "负责人"],
+      ["Next Action", "下一步"],
+      ["Today", "今天"],
+      ["Unassigned", "未分配"],
+      ["Missing", "缺失"],
+      ["Application Timeline", "申请时间线"],
+      ["Structured evidence events", "结构化证据事件"],
+      ["Owner Load", "负责人负载"],
+      ["Current owner responsibility", "当前负责人职责"],
+      ["Application Agent", "申请 Agent"],
+      ["Status and next action", "状态与下一步"],
+      ["Resolve now", "立即处理"],
+      ["Assign Quang Do to Linh Tran or pause the application until job match is confirmed.", "将 Quang Do 分配给 Linh Tran，或在岗位匹配确认前暂停该申请。"],
+      ["Assessments should close evidence gaps, not become extra process drag.", "测评应补齐证据缺口，而不是制造额外流程负担。"],
+      ["Each assignment is tied to Scorecard criteria, candidate context, submitted artifacts, and a human-calibrated decision.", "每项作业都关联 Scorecard 标准、候选人上下文、提交材料和人工校准后的决策。"],
+      ["Stop Rule suggestion", "停止规则建议"],
+      ["For Trang Nguyen, evidence coverage is high enough to move to final interview without another assignment round.", "对 Trang Nguyen 来说，证据覆盖已足够进入终面，无需再增加一轮作业。"],
+      ["Open Assessments", "开放测评"],
+      ["Submitted", "已提交"],
+      ["Avg Review Time", "平均审核时间"],
+      ["Assessment Workspace", "测评工作台"],
+      ["Submission status, rubric confidence, and next decision", "提交状态、Rubric 置信度和下一步决策"],
+      ["Sent", "已发送"],
+      ["Draft", "草稿"],
+      ["Rubric linked", "Rubric 已关联"],
+      ["Rubric", "Rubric"],
+      ["Submission", "提交"],
+      ["AI Review", "AI 审核"],
+      ["Parsed", "已解析"],
+      ["Strong evidence", "强证据"],
+      ["Mixed signal", "混合信号"],
+      ["Calibrate", "校准"],
+      ["Offer-ready", "Offer 就绪"],
+      ["Evidence Profile", "证据画像"],
+      ["Rubric-linked signals", "Rubric 关联信号"],
+      ["Debugging depth", "调试深度"],
+      ["Communication clarity", "沟通清晰度"],
+      ["Follow-up Queue", "跟进队列"],
+      ["Assessment operations", "测评运营"],
+      ["Now", "现在"],
+      ["Assessment Agent", "测评 Agent"],
+      ["Rubric and evidence", "Rubric 与证据"],
+      ["Review recommendation", "审核建议"],
+      ["Move Trang Nguyen forward and skip additional assessment.", "推进 Trang Nguyen，并跳过额外测评。"],
+      ["9 Applications are blocked; 4 are overdue enough to risk candidate drop-off.", "9 个申请处于阻塞状态，其中 4 个已逾期到可能导致候选人流失。"],
+      ["Blocked is the operational truth surface: who owns the next action, what is missing, and how long it has been stuck.", "Blocked 是运营事实界面：谁负责下一步、缺了什么、卡了多久。"],
+      ["AI escalation", "AI 升级提醒"],
+      ["The largest cause this week is missing interview feedback after time confirmation emails.", "本周最大原因是面试时间确认后缺少面试反馈。"],
+      ["Overdue SLA", "SLA 逾期"],
+      ["Blocked Applications", "阻塞申请"],
+      ["Reason, owner, next action and escalation path", "原因、负责人、下一步和升级路径"],
+      ["Reason", "原因"],
+      ["Age", "时长"],
+      ["Root Causes", "根因"],
+      ["What is creating blocks", "阻塞来源"],
+      ["Job match", "岗位匹配"],
+      ["Resolution Playbook", "处理手册"],
+      ["AI-drafted, human-approved actions", "AI 起草、人工批准的动作"],
+      ["Feedback reminder", "反馈提醒"],
+      ["Owner assignment", "负责人分配"],
+      ["Blocked Agent", "阻塞 Agent"],
+      ["Escalation and cleanup", "升级与清理"],
+      ["Resolve first", "优先处理"],
+      ["Pipeline visibility is improving, but execution delay is concentrated in interview feedback.", "流程可见性正在改善，但执行延迟集中在面试反馈。"],
+      ["Analytics here measures operational discipline, channel quality, and AI adoption without hiding the evidence behind black-box scores.", "这里的分析衡量运营纪律、渠道质量和 AI 采纳，而不是用黑箱分数隐藏证据。"],
+      ["AI metric caveat", "AI 指标说明"],
+      ["AI adoption is only counted when a human accepts a draft, recommendation, extracted event, or status update.", "只有人工接受草稿、建议、提取事件或状态更新时，才计入 AI 采纳。"],
+      ["Shortlist Rate", "入围率"],
+      ["AI Adoption", "AI 采纳"],
+      ["CV to Offer Decision conversion", "CV 到 Offer 决策转化"],
+      ["Volume", "数量"],
+      ["Rate", "比率"],
+      ["CVs", "CV 数"],
+      ["Offer", "Offer"],
+      ["HR Execution", "HR 执行"],
+      ["Operational speed and discipline", "运营速度与纪律"],
+      ["Channel Quality", "渠道质量"],
+      ["Source attribution from CV to decision quality", "从 CV 到决策质量的来源归因"],
+      ["Email inbound", "邮件流入"],
+      ["Referral", "推荐"],
+      ["Agency", "猎头"],
+      ["Forwarded profiles", "转发档案"],
+      ["Analytics Agent", "分析 Agent"],
+      ["Metrics with evidence", "有证据的指标"],
+      ["Operating insight", "运营洞察"],
+      ["5 high-value decisions are waiting, but only 2 are truly time-sensitive.", "5 个高价值决策在等待，但只有 2 个真正紧急。"],
+      ["Founder Inbox removes operational noise and shows the decision, evidence, risk, and recommended action in one place.", "创始人收件箱去除运营噪音，在一个地方展示决策、证据、风险和推荐动作。"],
+      ["Decision principle", "决策原则"],
+      ["Open Decisions", "开放决策"],
+      ["Avg Wait", "平均等待"],
+      ["Evidence Ready", "证据就绪"],
+      ["Risk Escalations", "风险升级"],
+      ["Decision Cards", "决策卡"],
+      ["Decision Anatomy", "决策结构"],
+      ["Every card follows the same hierarchy", "每张卡遵循同样的信息层级"],
+      ["Founder Agent", "创始人 Agent"],
+      ["Decision support", "决策支持"],
+      ["Decision recommendation", "决策建议"],
+      ["12 active jobs need workflow discipline before more intake volume lands.", "在更多简历进入前，12 个活跃岗位需要先补齐流程纪律。"],
+      ["AI setup suggestion", "AI 设置建议"],
+      ["Active Jobs", "活跃岗位"],
+      ["Missing SLA", "缺少 SLA"],
+      ["Draft JDs", "JD 草稿"],
+      ["Workflow Gaps", "流程缺口"],
+      ["Job Control Table", "岗位控制表"],
+      ["Role-level health before candidates move through pipeline", "候选人流转前的岗位级健康度"],
+      ["Paused", "已暂停"],
+      ["AI checks enabled", "AI 检查已开启"],
+      ["Job", "岗位"],
+      ["Pipeline", "流程"],
+      ["Scorecard", "Scorecard"],
+      ["Workflow Defaults", "流程默认值"],
+      ["Scorecard Coverage", "Scorecard 覆盖"],
+      ["Signals by role family", "按岗位族展示信号"],
+      ["Job Agent", "岗位 Agent"],
+      ["Workflow and scorecard setup", "流程与 Scorecard 设置"],
+      ["AI Hiring Operating System", "AI 招聘操作系统"],
+      ["Evidence", "证据"],
+      ["Confidence", "置信度"],
+      ["+42 from email intake this week", "本周来自邮件录入 +42"],
+      ["14 low-confidence job matches", "14 个低置信度岗位匹配"],
+      ["3 final interview, 2 offer decision", "3 个终面，2 个 Offer 决策"],
+      ["4 overdue SLA, 3 missing owner", "4 个 SLA 逾期，3 个缺少负责人"],
+      ["Interview", "面试"],
+      ["Assessment", "测评"],
+      ["Owner: Linh Tran · 74 applications", "负责人：Linh Tran · 74 个申请"],
+      ["Assessment-heavy pipeline", "测评较重的流程"],
+      ["3 blocked", "3 个阻塞"],
+      ["Owner: Mai Ho · 43 applications", "负责人：Mai Ho · 43 个申请"],
+      ["Feedback due today", "反馈今日到期"],
+      ["Owner: Bao Vo · 38 applications", "负责人：Bao Vo · 38 个申请"],
+      ["Offer decision stage", "Offer 决策阶段"],
+      ["5 open", "5 个待处理"],
+      ["Senior Backend Engineer · Final interview", "高级后端工程师 · 终面"],
+      ["Product Designer · Assessment review", "产品设计师 · 测评审核"],
+      ["GTM Lead · Offer decision", "GTM 负责人 · Offer 决策"],
+      ["Trang Nguyen · 3 files attached", "Trang Nguyen · 已附 3 个文件"],
+      ["Product Designer · evidence gap reduced", "产品设计师 · 证据缺口已减少"],
+      ["Email", "邮件"],
+      ["Candidate may fit Backend or Platform", "候选人可能适合后端或平台岗位"],
+      ["HireOS Agent", "HireOS Agent"],
+      ["Evidence, risk, next action", "证据、风险、下一步"],
+      ["Assessment score exceeds Backend rubric threshold in system design and debugging.", "测评分数在系统设计和调试维度超过后端评分标准阈值。"],
+      ["Candidate mentioned another offer timeline in yesterday's email.", "候选人在昨天邮件中提到另一个 Offer 时间线。"],
+      ["High · 7 linked evidence events, no unresolved interviewer conflict.", "高 · 已关联 7 个证据事件，没有未解决的面试官冲突。"],
+      ["I found 9 blocked applications. The biggest pattern is missing interview feedback after scheduling confirmation.", "我发现 9 个阻塞申请。最大模式是面试时间确认后缺少面试反馈。"],
+      ["Which ones need Founder attention?", "哪些需要创始人关注？"],
+      ["Three: Anh Le has mixed design feedback, Minh Pham needs offer decision, and Trang Nguyen has a competing timeline risk.", "三个：Anh Le 的设计反馈混合，Minh Pham 需要 Offer 决策，Trang Nguyen 有竞争 Offer 时间线风险。"],
+      ["Recommended setup", "推荐设置"],
+    ]);
+
+    const enTextMap = new Map([...zhTextMap].map(([en, zh]) => [zh, en]));
+
+    const zhPlaceholderMap = new Map([
+      ["Ask about pipeline, evidence, risk...", "询问流程、证据、风险..."],
+      ["Ask about this mailbox...", "询问这个邮箱..."],
+      ["Ask about job setup...", "询问岗位设置..."],
+      ["Ask about applications...", "询问申请流程..."],
+      ["Ask about candidate history...", "询问候选人历史..."],
+      ["Ask about assessment evidence...", "询问测评证据..."],
+      ["Ask about founder decisions...", "询问创始人决策..."],
+      ["Ask how to unblock...", "询问如何解除阻塞..."],
+      ["Ask about hiring metrics...", "询问招聘指标..."],
+      ["Search sender, job, attachment", "搜索发件人、岗位、附件"],
+      ["Search candidate, job, rubric", "搜索候选人、岗位、Rubric"],
+      ["Search jobs, owner, location", "搜索岗位、负责人、地点"],
+      ["Search candidate, job, owner", "搜索候选人、岗位、负责人"],
+      ["Search name, email, source", "搜索姓名、邮箱、来源"],
+      ["Search blocked item, owner, reason", "搜索阻塞项、负责人、原因"],
+    ]);
+
+    const enPlaceholderMap = new Map([...zhPlaceholderMap].map(([en, zh]) => [zh, en]));
+
+    function replaceTextNode(node, map) {
+      const value = node.nodeValue;
+      const trimmed = value.trim();
+      if (!trimmed || !map.has(trimmed)) return;
+      node.nodeValue = value.replace(trimmed, map.get(trimmed));
+    }
+
+    function walkText(root, map) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent || ["SCRIPT", "STYLE"].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      });
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach((node) => replaceTextNode(node, map));
+    }
+
+    function applyLanguage(lang) {
+      const toZh = lang === "zh";
+      walkText(document.body, toZh ? zhTextMap : enTextMap);
+      document.querySelectorAll("input[placeholder]").forEach((input) => {
+        const map = toZh ? zhPlaceholderMap : enPlaceholderMap;
+        if (map.has(input.placeholder)) input.placeholder = map.get(input.placeholder);
+      });
+      document.documentElement.lang = toZh ? "zh-CN" : "en";
+      localStorage.setItem("hireos-language-v2", lang);
+      document.querySelectorAll(".language-switch button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.lang === lang);
+      });
+    }
+
+
+    function setSidebarState(collapsed, persist = true) {
+      document.body.classList.toggle("sidebar-collapsed", collapsed);
+      document.body.classList.remove("account-menu-open");
+      if (persist) {
+        localStorage.setItem("hireos-sidebar-collapsed", collapsed ? "true" : "false");
+      }
+      document.querySelectorAll(".sidebar-toggle").forEach((button) => {
+        setToggleIcon(button, "panel-left-close", "收起侧边栏");
+      });
+      document.querySelectorAll(".sidebar-logo-toggle").forEach((button) => {
+        if (collapsed) {
+          setToggleIcon(button, "panel-left-open", "展开侧边栏");
+        } else {
+          button.textContent = "H";
+          button.setAttribute("aria-label", "HireOS");
+          button.setAttribute("title", "HireOS");
+          refreshIcons();
+        }
+      });
+    }
+
+    document.querySelectorAll(".sidebar-toggle, .sidebar-logo-toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        setSidebarState(!document.body.classList.contains("sidebar-collapsed"));
+      });
+    });
+
+    document.querySelectorAll(".agent-toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        const collapsed = document.body.classList.toggle("agent-collapsed");
+        if (!collapsed) {
+          document.body.classList.remove("dock-expanded");
+        }
+        setToggleIcon(button, collapsed ? "panel-right-open" : "panel-right-close", collapsed ? "展开 Agent" : "收起 Agent");
+      });
+    });
+
+    document.querySelectorAll(".agent-dock-bar").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.body.classList.toggle("dock-expanded");
+      });
+    });
+
+    document.querySelectorAll(".agent-dock-prompts button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.body.classList.remove("agent-collapsed", "dock-expanded");
+        document.querySelectorAll(".agent-toggle").forEach((toggle) => {
+          setToggleIcon(toggle, "panel-right-close", "收起 Agent");
+        });
+      });
+    });
+
+    document.querySelectorAll(".user-status, .account-toggle").forEach((target) => {
+      target.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (document.body.classList.contains("sidebar-collapsed")) return;
+        const open = document.body.classList.toggle("account-menu-open");
+        document.querySelectorAll(".user-status").forEach((status) => {
+          status.setAttribute("aria-expanded", String(open));
+        });
+      });
+    });
+
+    document.querySelectorAll(".language-switch button").forEach((button) => {
+      const label = button.textContent.trim();
+      button.dataset.lang = label === "中文" ? "zh" : "en";
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        applyLanguage(button.dataset.lang);
+      });
+    });
+
+    document.addEventListener("click", () => {
+      document.body.classList.remove("account-menu-open");
+    });
+
+    setSidebarState(localStorage.getItem("hireos-sidebar-collapsed") === "true", false);
+    applyLanguage(localStorage.getItem("hireos-language-v2") || "zh");
+    refreshIcons();
+  </script>
+</body>
+</html>

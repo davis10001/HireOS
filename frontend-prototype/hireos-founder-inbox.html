@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>HireOS Founder Inbox</title><link rel="stylesheet" href="./hireos-pages.css" /><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航"><div class="brand"><button class="brand-mark sidebar-logo-toggle" aria-label="HireOS" title="HireOS">H</button><div class="brand-copy"><strong>HireOS</strong><span>AI Hiring Operating System</span></div><button class="icon-button sidebar-toggle" aria-label="收起侧边栏" title="收起侧边栏"><i data-lucide="panel-left-close"></i></button></div><div class="nav-section">Operate</div>
+      <nav class="nav">
+        <a class="nav-item" href="./hireos-dashboard-design.html"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+        <a class="nav-item" href="./hireos-jobs.html"><i data-lucide="briefcase-business"></i><span>Jobs</span><span class="count">12</span></a>
+        <a class="nav-item active" href="./hireos-inbox.html"><i data-lucide="inbox"></i><span>Inbox</span><span class="count">76</span></a>
+        
+      </nav>
+      <div class="nav-section">Intelligence</div>
+      <nav class="nav">
+        <a class="nav-item" href="./hireos-analytics.html"><i data-lucide="chart-no-axes-combined"></i><span>Analytics</span></a>
+        <a class="nav-item" href="./hireos-settings.html"><i data-lucide="settings"></i><span>Settings</span></a>
+      </nav><div class="sidebar-footer"><div class="user-status" role="button" tabindex="0" aria-expanded="false"><div class="avatar">LT</div><div class="user-copy"><strong>Linh Tran</strong><span><b></b> Online · HR Lead</span></div><button class="account-toggle" aria-label="账户菜单" title="账户菜单"><i data-lucide="chevron-up"></i></button></div><div class="account-menu"><button type="button"><i data-lucide="user-round"></i> Profile</button><button type="button"><i data-lucide="bell"></i> Notifications</button><div class="language-switch" aria-label="语言切换"><span>Language</span><div><button class="active" type="button">EN</button><button type="button">中文</button></div></div><button type="button"><i data-lucide="log-out"></i> Sign out</button></div></div></aside>
+    <main class="main">
+      <header class="topbar"><div class="page-title"><h1>Founder Inbox</h1><p>集中处理 Scorecard 确认、关键候选人查看、Assessment Review、终面决策、Offer Decision 和重大风险升级。</p></div><div class="top-actions"><button class="ghost-button"><i data-lucide="list-filter"></i> Priority</button><button class="primary-button"><i data-lucide="check-check"></i> Batch Review</button></div></header>
+      <section class="page-content">
+        <div class="hero-row"><section class="hero-panel"><h2>5 high-value decisions are waiting, but only 2 are truly time-sensitive.</h2><p>Founder Inbox removes operational noise and shows the decision, evidence, risk, and recommended action in one place.</p></section><section class="hero-panel ai"><h2>Decision principle</h2><p>AI can recommend next steps, but final interview, rejection, and offer decisions require human approval.</p></section></div>
+        <section class="metric-grid"><div class="metric"><div class="metric-label">Open Decisions <i data-lucide="inbox"></i></div><strong>5</strong><small>3 final, 2 offer</small></div><div class="metric"><div class="metric-label">Avg Wait <i data-lucide="timer"></i></div><strong>14h</strong><small>Founder waiting time</small></div><div class="metric"><div class="metric-label">Evidence Ready <i data-lucide="badge-check"></i></div><strong>3</strong><small>No missing evidence</small></div><div class="metric warning"><div class="metric-label">Risk Escalations <i data-lucide="triangle-alert"></i></div><strong>2</strong><small>Candidate timeline or comp risk</small></div></section>
+        <section class="content-grid">
+          <div class="panel"><div class="panel-header"><div><h2>Decision Cards</h2><p>Prioritized by risk, evidence readiness, and SLA</p></div><div class="tabs"><button class="tab active">Now</button><button class="tab">Later</button></div></div><div class="cards"><div class="work-card ai"><div class="card-top"><div class="person-row"><div class="avatar">TN</div><div class="card-copy"><strong>Trang Nguyen · Final interview</strong><p>Strong assessment and interviewer alignment. Competing offer timeline risk.</p></div></div><span class="pill green">Ready</span></div></div><div class="work-card"><div class="card-top"><div class="person-row"><div class="avatar">MP</div><div class="card-copy"><strong>Minh Pham · Offer Decision</strong><p>Evidence complete. Remaining risk is compensation range.</p></div></div><span class="pill warn">Risk</span></div></div><div class="work-card"><div class="card-top"><div class="person-row"><div class="avatar">AL</div><div class="card-copy"><strong>Anh Le · Assessment Review</strong><p>Mixed design feedback. Needs founder calibration on product taste.</p></div></div><span class="pill warn">Review</span></div></div></div></div>
+          <div class="panel"><div class="panel-header"><div><h2>Decision Anatomy</h2><p>Every card follows the same hierarchy</p></div></div><div class="timeline"><div class="timeline-row"><time>1</time><div class="cell-main"><strong>Decision</strong><span>Final interview, reject, hold, or offer decision</span></div><span class="pill green">Top</span></div><div class="timeline-row"><time>2</time><div class="cell-main"><strong>Evidence</strong><span>Linked email, feedback, assessment, scorecard</span></div><span class="pill">Trace</span></div><div class="timeline-row"><time>3</time><div class="cell-main"><strong>Risk</strong><span>Candidate timeline, comp, evidence gaps</span></div><span class="pill warn">Human</span></div></div></div>
+        </section>
+      </section>
+    </main>
+    <aside class="agent" aria-label="Agent 对话区"><header class="agent-header"><div class="agent-title"><div class="agent-orb"><i data-lucide="sparkles"></i></div><div><strong>Founder Agent</strong><span>Decision support</span></div></div><button class="icon-button agent-toggle" aria-label="收起 Agent" title="收起 Agent"><i data-lucide="panel-right-close"></i></button></header><div class="agent-body"><section class="agent-card ai"><h3>Decision recommendation</h3><p>Approve final interview for Trang Nguyen today.</p><div class="evidence-list"><div class="evidence-item"><span>Evidence</span><strong>Assessment exceeds threshold; no interviewer disagreement.</strong></div><div class="evidence-item"><span>Risk</span><strong>Candidate has another offer deadline this week.</strong></div><div class="evidence-item"><span>Confidence</span><strong>High · 7 linked events.</strong></div></div><div class="agent-actions"><button class="approve">Approve</button><button class="review">Open card</button></div></section></div><footer class="agent-compose"><div class="compose-box"><input aria-label="向 Agent 提问" placeholder="Ask about founder decisions..." /><button class="icon-button" aria-label="发送"><i data-lucide="send-horizontal"></i></button></div></footer></aside>
+  <div class="agent-dock" aria-label="Agent 快捷输入">
+    <button class="agent-dock-bar" type="button">
+      <i data-lucide="sparkles"></i>
+      <span>Ask HireOS Agent about this page...</span>
+      <i data-lucide="send-horizontal"></i>
+    </button>
+    <div class="agent-dock-prompts">
+      <button type="button">Summarize risks</button>
+      <button type="button">Suggest next action</button>
+      <button type="button">Show evidence gaps</button>
+    </div>
+  </div>
+  </div><script src="./hireos-pages.js"></script>
+</body></html>
