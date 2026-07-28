@@ -1363,7 +1363,91 @@ body.modal-open {
 }
 
 .tasks-table .table-row {
-  grid-template-columns: minmax(190px, 1.35fr) minmax(112px, 0.65fr) minmax(104px, 0.6fr) minmax(160px, 1fr) minmax(118px, 0.7fr) minmax(160px, 0.75fr);
+  grid-template-columns: minmax(260px, 1.45fr) minmax(180px, 0.9fr) minmax(154px, auto);
+  gap: 16px;
+}
+
+.tasks-table .task-list-row {
+  min-height: 72px;
+  padding-block: 12px;
+}
+
+.task-summary-cell,
+.task-owner-action,
+.task-row-tail {
+  min-width: 0;
+}
+
+.task-summary-cell,
+.task-owner-action {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+}
+
+.task-title,
+.task-owner-action strong {
+  overflow: visible;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.3;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.task-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.task-meta-line > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-module-pill {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.task-label {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.2;
+}
+
+.task-row-tail {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.task-row-tail .pill {
+  max-width: 118px;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+
+.task-row-tail .row-action {
+  min-height: 34px;
+  padding-inline: 12px;
 }
 
 .candidates-table .table-row {

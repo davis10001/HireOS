@@ -422,7 +422,10 @@ describe("Login + Jobs prototype slice", () => {
 
     await user.click(screen.getByRole("button", { name: "Critical" }));
     expect(screen.getByText("Founder final interview approval")).toBeInTheDocument();
-    expect(screen.getByText("Source: Applications")).toBeInTheDocument();
+    const founderRow = screen.getByText("Founder final interview approval").closest(".table-row");
+    expect(founderRow).not.toBeNull();
+    expect(within(founderRow as HTMLElement).getByText("Applications")).toBeInTheDocument();
+    expect(within(founderRow as HTMLElement).queryByText(/Source:/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Waiting on Others" }));
     expect(screen.getByText("Assessment submission follow-up")).toBeInTheDocument();

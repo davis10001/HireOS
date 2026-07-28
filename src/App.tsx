@@ -741,15 +741,24 @@ function TasksPage({ actor, onTaskAction, tasks }: { actor: { name: string; role
             ))}
           </div>
           <div className="table tasks-table">
-            <div className="table-row header"><span>Task</span><span>Source</span><span>Owner</span><span>Next Action</span><span>SLA</span><span>Action</span></div>
+            <div className="table-row header"><span>Task</span><span>Owner & Action</span><span>SLA</span></div>
             {visibleTasks.map((task) => (
-              <div className="table-row" key={task.id}>
-                <div className="cell-main"><strong>{task.title}</strong><span>{task.completedAction ? `Action recorded: ${task.completedAction}` : task.risk ?? "Ready for review"}</span></div>
-                <span>Source: {task.sourceModule}</span>
-                <span>{task.owner ?? task.ownerRole ?? "Unassigned"}</span>
-                <span>{task.nextAction}</span>
-                <span className={`pill ${task.slaState === "Today" || task.slaState === "Blocked" ? "warn" : "green"}`}>{task.slaState}{task.dueAt ? ` · ${new Date(task.dueAt).toLocaleDateString("en-CA")}` : ""}</span>
-                <button className="ghost-button row-action" type="button" onClick={() => setSelectedTaskId(task.id)}>Open {task.title}</button>
+              <div className="table-row task-list-row" key={task.id}>
+                <div className="task-summary-cell">
+                  <strong className="task-title">{task.title}</strong>
+                  <div className="task-meta-line">
+                    <span className="task-module-pill">{task.sourceModule}</span>
+                    <span>{taskContextCopy(task)}</span>
+                  </div>
+                </div>
+                <div className="task-owner-action">
+                  <span className="task-label">{task.owner ?? task.ownerRole ?? "Unassigned"}</span>
+                  <strong>{task.completedAction ? `Recorded: ${task.completedAction}` : taskListActionCopy(task)}</strong>
+                </div>
+                <div className="task-row-tail">
+                  <span className={`pill ${task.slaState === "Today" || task.slaState === "Blocked" ? "warn" : "green"}`}>{taskSlaCopy(task)}</span>
+                  <button aria-label={`Open ${task.title}`} className="ghost-button row-action" type="button" onClick={() => setSelectedTaskId(task.id)}>Open</button>
+                </div>
               </div>
             ))}
           </div>
@@ -1798,6 +1807,19 @@ function formatDateTime(value?: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return `${date.toLocaleDateString("en-CA")} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function taskContextCopy(task: RecruitingTask): string {
+  return task.relatedObjects[0]?.label ?? task.priority;
+}
+
+function taskSlaCopy(task: RecruitingTask): string {
+  if (!task.dueAt) return task.slaState;
+  return `${task.slaState} · ${new Date(task.dueAt).toLocaleDateString("en-CA")}`;
+}
+
+function taskListActionCopy(task: RecruitingTask): string {
+  return task.allowedActions[0]?.label ?? task.nextAction;
 }
 
 function routedAuditCopy(action?: string, actor?: string): string {
