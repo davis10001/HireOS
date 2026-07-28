@@ -1197,7 +1197,8 @@ Applied -> Reverted
 
 核心场景：
 
-- HR 新建岗位并让 AI 生成 JD 与 Scorecard。
+- Founder / Hiring Manager 用自然语言描述招聘需求，由 AI 多轮追问后生成可审核 Job Package。
+- HR 新建岗位并让 AI 生成 JD、Scorecard 与筛选问题。
 - Founder 审核岗位标准。
 - HR 查看所有活跃、暂停、草稿、关闭岗位。
 - HR 暂停某个岗位的邮件自动匹配。
@@ -1207,9 +1208,12 @@ Applied -> Reverted
 - 岗位列表。
 - 按状态、岗位、负责人、团队筛选。
 - 新建岗位向导。
+- Create with AI：通过 AI 对话创建岗位。
+- AI 多轮追问缺失项。
 - AI 生成 JD 草稿。
 - AI 推荐招聘流程模板。
 - AI 生成 Scorecard 初稿。
+- AI 生成 Screening Questions 和 Interview Plan 初稿。
 - 编辑岗位详情。
 - 设置岗位状态。
 - 设置自动邮件匹配规则。
@@ -1222,18 +1226,34 @@ Applied -> Reverted
 3. AI 生成：JD、流程模板、Scorecard、Assessment 建议。
 4. 编辑确认：确认 JD、流程、Owner、SLA、Scorecard、邮件自动匹配。
 
+AI 创建岗位流程：
+
+1. 用户点击 Create with AI。
+2. 用户用自然语言输入招聘需求。
+3. AI 只追问创建岗位必要字段：岗位名称、招聘原因、90 天目标、核心职责、Must-have、预算范围、工作地点 / 办公方式、汇报对象、英语要求、不合适候选人画像。
+4. 当必要字段齐全后，AI 生成 Job Package 初稿：External JD、Internal Role Brief、Must-have、Nice-to-have、Knockout Criteria、Scorecard、Screening Questions、Interview Plan。
+5. 用户可继续对话修改，或手动编辑字段。
+6. 用户保存 Draft 或 Approve Job Package。
+7. Approve 后写入 Jobs，并生成后续 Task，例如 Review AI Job Package 或 Publish approved job。
+
 业务规则：
 
 - 新建岗位默认 Draft。
 - Active Job 必须完成配置完整性检查。
 - 暂停岗位后，新邮件不能自动创建 Application。
 - 关闭岗位后，不允许新增 Application。
+- AI 不允许自动发布岗位；Job Package 必须经人工 Approve 才能进入可发布状态。
+- AI 输出、用户修改、审批人和审批时间必须进入 AI Action / Audit Log。
+- MVP 阶段 AI Job Assistant 只做 L1 Suggest / L2 Draft，不做候选人自动匹配、自动发布或自动发邮件。
 
 验收标准：
 
 - 用户能完成从空白到 Draft Job 的创建。
 - 用户能发布满足条件的 Active Job。
 - 不满足条件的 Job 发布时必须显示缺失项。
+- 用户能从 Jobs 点击 Create with AI，通过多轮对话生成 Job Package。
+- 用户能编辑 AI 生成的 Job Package 并保存 Draft。
+- 用户 Approve 后，新岗位出现在 Jobs，并产生可追踪的 Task / Audit 记录。
 
 ### 8.4 Job Detail
 
@@ -1691,7 +1711,54 @@ Applied -> Reverted
 
 ## 9. AI 能力规格
 
-### 9.1 AI Email Intake
+### 9.1 AI Job Intake / JD Builder
+
+AI Job Intake / JD Builder 是 HireOS 的第一项真实 AI MVP 能力。它的目标不是让 AI 直接发布岗位，而是把 Founder / Hiring Manager 的模糊招聘需求，通过多轮引导转化为可审核、可编辑、可追踪的 Job Package。
+
+输入：
+
+- 用户自然语言招聘需求。
+- 当前 Job Draft。
+- 用户在对话中补充的回答。
+- 既有岗位模板。
+- 组织默认 Owner、SLA、招聘流程模板。
+
+必要追问字段：
+
+- 岗位名称。
+- 招聘原因。
+- 90 天目标。
+- 核心职责。
+- Must-have 条件。
+- 预算范围。
+- 工作地点 / 办公方式。
+- 汇报对象。
+- 英语要求。
+- 不合适候选人画像。
+
+输出：
+
+- External JD。
+- Internal Role Brief。
+- Must-have。
+- Nice-to-have。
+- Knockout Criteria。
+- Scorecard。
+- Screening Questions。
+- Interview Plan。
+- 缺失项清单。
+- 风险 / 矛盾提示。
+- 置信度。
+
+边界：
+
+- AI 可以追问、总结、生成草稿和指出矛盾。
+- AI 不可以自动发布岗位。
+- AI 不可以自动创建候选人匹配、发送邮件或启动招聘流程。
+- 用户必须能编辑 AI 输出。
+- Approve 前只能保存为 Draft。
+
+### 9.2 AI Email Intake
 
 输入：
 
@@ -1711,25 +1778,6 @@ Applied -> Reverted
 - Application 创建/更新建议。
 - Evidence Event。
 - 置信度。
-
-### 9.2 AI Job Assistant
-
-输入：
-
-- 岗位目标。
-- 核心要求。
-- 预算与级别。
-- 成功标准。
-- 历史岗位模板。
-
-输出：
-
-- JD 草稿。
-- Scorecard。
-- Screening Criteria。
-- Workflow Template。
-- Assessment Plan。
-- SLA 建议。
 
 ### 9.3 AI Next-Step Recommendation
 
@@ -2137,7 +2185,16 @@ AI 禁止执行：
 - L1 Suggest / L2 Draft / L3 Execute / L4 Execute + Escalate。
 - 撤销和纠错。
 
-### Epic 8：Founder Decision
+### Epic 8：AI Job Intake / JD Builder
+
+- Jobs 页面 Create with AI 入口。
+- AI 多轮追问必要岗位字段。
+- Job Package 草稿生成。
+- 用户编辑、保存 Draft、Approve。
+- Approve 后写入 Jobs 并生成后续 Task。
+- AI Action / Audit Log 记录生成、修改、审批。
+
+### Epic 9：Founder Decision
 
 - Decision Card。
 - Founder Inbox。
@@ -2145,7 +2202,7 @@ AI 禁止执行：
 - Offer Decision。
 - Founder Decision Task。
 
-### Epic 9：Assessment Workspace
+### Epic 10：Assessment Workspace
 
 - Assessment。
 - Submission。
@@ -2154,7 +2211,7 @@ AI 禁止执行：
 - Stop Rule。
 - Assessment Task 生成规则。
 
-### Epic 10：Analytics
+### Epic 11：Analytics
 
 - 事件埋点。
 - 指标口径。
