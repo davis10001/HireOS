@@ -193,7 +193,9 @@ const appCopy = {
     jobs: "Jobs",
     language: "Language",
     newCandidate: "New Candidate",
+    notifications: "Notifications",
     operate: "Operate",
+    profile: "Profile",
     settings: "Settings",
     tasks: "Tasks",
     signOut: "Sign out"
@@ -211,7 +213,9 @@ const appCopy = {
     jobs: "岗位",
     language: "语言",
     newCandidate: "新建候选人",
+    notifications: "通知",
     operate: "运营",
+    profile: "个人资料",
     settings: "设置",
     tasks: "任务",
     signOut: "退出登录"
@@ -655,8 +659,8 @@ function AppShell({
             </span>
           </button>
           <div className={`account-menu ${accountOpen ? "is-open" : ""}`}>
-            <button type="button"><UserRound aria-hidden="true" /> Profile</button>
-            <button type="button"><Bell aria-hidden="true" /> Notifications</button>
+            <button type="button"><UserRound aria-hidden="true" /> {copy.profile}</button>
+            <button type="button"><Bell aria-hidden="true" /> {copy.notifications}</button>
             <div className="language-switch" aria-label="语言切换"><span>{copy.language}</span><div>{(["EN", "中文"] as const).map((item) => <button aria-pressed={language === item} className={language === item ? "active" : ""} key={item} onClick={() => onLanguageChange(item)} type="button">{item}</button>)}</div></div>
             <button type="button" onClick={onSignOut}><LogOut aria-hidden="true" /> {copy.signOut}</button>
           </div>
@@ -2055,7 +2059,7 @@ function saveGovernance(governance: GovernanceState) {
 }
 
 function loadLanguage(): Language {
-  return loadLocalState(LANGUAGE_KEY, "EN" as Language);
+  return loadLocalState(LANGUAGE_KEY, "中文" as Language);
 }
 
 function saveLanguage(language: Language) {

@@ -6,6 +6,7 @@ import { renderApp } from "./test-utils/render";
 describe("Login + Jobs prototype slice", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("hireos.language", JSON.stringify("EN"));
   });
 
   it("shows login before authentication", () => {
@@ -89,6 +90,21 @@ describe("Login + Jobs prototype slice", () => {
     await user.click(screen.getByRole("button", { name: "设置" }));
     expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
     expect(screen.getByText("治理任务队列")).toBeInTheDocument();
+  });
+
+  it("defaults fresh authenticated users to Chinese", async () => {
+    window.localStorage.clear();
+    window.history.pushState({}, "", "/dashboard");
+    const user = userEvent.setup();
+    renderApp();
+
+    await login(user);
+
+    expect(screen.getByRole("heading", { name: "今日首页" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /account menu 用户菜单 linh tran/i }));
+    expect(within(screen.getByLabelText("语言切换")).getByRole("button", { name: "中文" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "个人资料" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "通知" })).toBeInTheDocument();
   });
 
   it("shows login validation errors and persists successful auth", async () => {

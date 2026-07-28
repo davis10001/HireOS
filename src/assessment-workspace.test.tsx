@@ -6,6 +6,7 @@ import { renderApp } from "./test-utils/render";
 describe("Assessment workspace prototype parity", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("hireos.language", JSON.stringify("EN"));
     window.history.pushState({}, "", "/assessments");
   });
 
